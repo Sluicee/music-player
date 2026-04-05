@@ -75,11 +75,13 @@
     flex: 1;
     min-height: 0;
     overflow: hidden;
-    perspective: 900px;
-    perspective-origin: 50% 20%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .slider {
+    width: 100%;
     height: 100%;
     display: flex;
     transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -90,17 +92,16 @@
     width: 100%;
     height: 100%;
     display: flex;
-    align-items: stretch;
+    align-items: center;
+    justify-content: center;
   }
 
   .grid {
-    width: 100%;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    grid-template-rows: repeat(3, 1fr);
-    gap: 10px;
-    transform: rotateX(8deg);
-    transform-origin: top center;
-    transform-style: preserve-3d;
+    grid-template-columns: repeat(4, 150px);
+    grid-template-rows: repeat(3, auto);
+    gap: 28px 24px;
+    transform: perspective(1000px) rotateX(12deg);
+    transform-origin: center 30%;
   }
 </style>
