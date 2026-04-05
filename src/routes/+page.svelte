@@ -1,34 +1,99 @@
 <script lang="ts">
-  let librarySize = '0.0 GB';
+  import { invoke } from '@tauri-apps/api/core';
+  import AlbumGrid from '$lib/components/AlbumGrid.svelte';
+  import {
+    albums,
+    isScanning,
+    librarySize,
+    selectedAlbum,
+    scanFolder,
+  } from '$lib/stores/library';
+  import {
+    currentTrack,
+    currentAlbum,
+    isPlaying,
+    isPaused,
+    pause,
+    resume,
+  } from '$lib/stores/player';
+  import type { Album } from '$lib/types';
+
+  async function pickFolder() {
+    const path = await invoke<string | null>('pick_folder');
+    if (path) await scanFolder(path);
+  }
+
+  function selectAlbum(album: Album) {
+    selectedAlbum.set(album);
+  }
+
+  async function togglePlayback() {
+    if ($isPlaying) await pause();
+    else await resume();
+  }
 </script>
 
 <div class="shell">
 
-  <!-- Top: Memory Card info -->
+  <!-- Header -->
   <header class="header">
-    <div class="memory-card-label">Memory Card</div>
-    <div class="library-size">{librarySize}</div>
+    <div class="header-left">
+      <button class="folder-btn" onclick={pickFolder} title="Choose music folder">
+        <span class="folder-icon">⊞</span>
+        <span class="memory-label">Memory Card</span>
+      </button>
+      {#if $librarySize !== '0 MB'}
+        <span class="lib-size">{$librarySize}</span>
+      {/if}
+    </div>
+
+    {#if $isScanning}
+      <span class="scanning">Scanning…</span>
+    {/if}
   </header>
 
-  <!-- Middle: Album grid -->
+  <!-- Album grid -->
   <main class="content">
-    <div class="placeholder">
-      <p>No albums found</p>
-    </div>
+    {#if $isScanning}
+      <div class="state-msg">
+        <div class="spinner"></div>
+        <p>Reading library…</p>
+      </div>
+    {:else if $albums.length === 0}
+      <div class="state-msg">
+        <p class="hint">Click <strong>Memory Card</strong> to choose a music folder</p>
+      </div>
+    {:else}
+      <AlbumGrid albums={$albums} onselect={selectAlbum} />
+    {/if}
   </main>
 
-  <!-- Bottom: Controls bar -->
+  <!-- Footer -->
   <footer class="footer">
-    <!-- Current track button -->
-    <button class="now-playing">
-      <div class="now-playing-art"></div>
-      <div class="now-playing-info">
-        <span class="now-playing-track">No track playing</span>
-        <span class="now-playing-artist">—</span>
+    <!-- Now playing -->
+    <button
+      class="now-playing"
+      class:active={!!$currentTrack}
+      onclick={togglePlayback}
+      disabled={!$currentTrack}
+    >
+      <div class="now-playing-art">
+        {#if $currentAlbum?.cover_art}
+          <img src={$currentAlbum.cover_art} alt="" />
+        {:else}
+          <span>♪</span>
+        {/if}
       </div>
+      <div class="now-playing-info">
+        <span class="track-name">{$currentTrack?.title ?? 'No track playing'}</span>
+        <span class="track-artist">{$currentTrack?.artist ?? '—'}</span>
+      </div>
+      {#if $currentTrack}
+        <span class="play-indicator">{$isPlaying ? '⏸' : '▶'}</span>
+      {/if}
     </button>
 
-    <!-- PS2-style action hints -->
+    <!-- PS2 action hints -->
     <div class="actions">
       <div class="action-hint">
         <span class="btn-icon cross">✕</span>
@@ -58,46 +123,87 @@
     display: grid;
     grid-template-rows: auto 1fr auto;
     padding: 28px 32px 20px;
-    gap: 0;
   }
 
   /* ── Header ── */
   .header {
     display: flex;
-    align-items: baseline;
-    gap: 14px;
+    align-items: center;
+    justify-content: space-between;
     padding-bottom: 4px;
   }
 
-  .memory-card-label {
+  .header-left {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .folder-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    transition: opacity 0.15s;
+  }
+
+  .folder-btn:hover { opacity: 0.7; }
+
+  .folder-icon {
+    font-size: 16px;
+    color: var(--text-secondary);
+  }
+
+  .memory-label {
     font-size: 22px;
     font-weight: 600;
     color: var(--text-primary);
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
   }
 
-  .library-size {
+  .lib-size {
     font-size: 13px;
-    font-weight: 400;
     color: var(--text-secondary);
-    letter-spacing: 0.03em;
+  }
+
+  .scanning {
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
   }
 
   /* ── Content ── */
   .content {
     overflow-y: auto;
-    padding: 24px 0;
+    padding: 20px 0;
   }
 
-  .placeholder {
+  .state-msg {
     height: 100%;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 16px;
     color: var(--text-dim);
-    font-size: 13px;
-    letter-spacing: 0.05em;
   }
+
+  .hint { font-size: 14px; }
+  .hint strong { color: var(--text-secondary); }
+
+  .spinner {
+    width: 28px;
+    height: 28px;
+    border: 2px solid rgba(90, 95, 120, 0.2);
+    border-top-color: var(--text-secondary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   /* ── Footer ── */
   .footer {
@@ -107,7 +213,6 @@
     padding-top: 8px;
   }
 
-  /* Now playing button */
   .now-playing {
     display: flex;
     align-items: center;
@@ -115,15 +220,16 @@
     background: var(--card-bg);
     border: none;
     border-radius: 12px;
-    padding: 10px 16px 10px 10px;
+    padding: 10px 14px 10px 10px;
     cursor: pointer;
     box-shadow: var(--btn-shadow);
     backdrop-filter: blur(12px);
-    transition: box-shadow 0.2s, transform 0.15s;
+    transition: box-shadow 0.2s, transform 0.15s, opacity 0.2s;
     max-width: 280px;
   }
 
-  .now-playing:hover {
+  .now-playing:disabled { opacity: 0.45; cursor: default; }
+  .now-playing:not(:disabled):hover {
     box-shadow: var(--card-shadow-hover);
     transform: translateY(-1px);
   }
@@ -131,34 +237,53 @@
   .now-playing-art {
     width: 40px;
     height: 40px;
-    border-radius: 6px;
-    background: rgba(90, 95, 120, 0.2);
+    border-radius: 7px;
+    background: rgba(90, 95, 120, 0.15);
     flex-shrink: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: var(--text-dim);
+  }
+
+  .now-playing-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .now-playing-info {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
     gap: 2px;
+    min-width: 0;
   }
 
-  .now-playing-track {
+  .track-name {
     font-size: 13px;
     font-weight: 600;
     color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 180px;
+    max-width: 160px;
   }
 
-  .now-playing-artist {
+  .track-artist {
     font-size: 11px;
     color: var(--text-secondary);
   }
 
-  /* PS2 action hints */
+  .play-indicator {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-left: 4px;
+    flex-shrink: 0;
+  }
+
+  /* PS2 buttons */
   .actions {
     display: flex;
     align-items: center;
@@ -190,9 +315,8 @@
     letter-spacing: 0.03em;
   }
 
-  /* PlayStation button colors */
-  .cross   { background: #4a90d9; color: #fff; }
-  .circle  { background: #d94a4a; color: #fff; }
-  .square  { background: #d94aaa; color: #fff; }
+  .cross    { background: #4a90d9; color: #fff; }
+  .circle   { background: #d94a4a; color: #fff; }
+  .square   { background: #d94aaa; color: #fff; }
   .triangle { background: #4aad6e; color: #fff; }
 </style>

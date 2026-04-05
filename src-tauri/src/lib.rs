@@ -3,6 +3,17 @@ mod scanner;
 
 use audio::{create_player, PlaybackState, SharedPlayer};
 use scanner::{calculate_library_size, scan_folder, Album};
+use tauri_plugin_dialog::DialogExt;
+
+// ── Dialog command ────────────────────────────────────────────────────────────
+
+#[tauri::command]
+fn pick_folder(app: tauri::AppHandle) -> Option<String> {
+    app.dialog()
+        .file()
+        .blocking_pick_folder()
+        .map(|p| p.to_string())
+}
 
 // ── Scanner commands ──────────────────────────────────────────────────────────
 
@@ -79,6 +90,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(player)
         .invoke_handler(tauri::generate_handler![
+            pick_folder,
             scan_music_folder,
             get_library_size,
             audio_play,
