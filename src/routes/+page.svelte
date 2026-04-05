@@ -1,156 +1,198 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
-
-  let name = $state("");
-  let greetMsg = $state("");
-
-  async function greet(event: Event) {
-    event.preventDefault();
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    greetMsg = await invoke("greet", { name });
-  }
+  let librarySize = '0.0 GB';
 </script>
 
-<main class="container">
-  <h1>Welcome to Tauri + Svelte</h1>
+<div class="shell">
 
-  <div class="row">
-    <a href="https://vite.dev" target="_blank">
-      <img src="/vite.svg" class="logo vite" alt="Vite Logo" />
-    </a>
-    <a href="https://tauri.app" target="_blank">
-      <img src="/tauri.svg" class="logo tauri" alt="Tauri Logo" />
-    </a>
-    <a href="https://svelte.dev" target="_blank">
-      <img src="/svelte.svg" class="logo svelte-kit" alt="SvelteKit Logo" />
-    </a>
-  </div>
-  <p>Click on the Tauri, Vite, and SvelteKit logos to learn more.</p>
+  <!-- Top: Memory Card info -->
+  <header class="header">
+    <div class="memory-card-label">Memory Card</div>
+    <div class="library-size">{librarySize}</div>
+  </header>
 
-  <form class="row" onsubmit={greet}>
-    <input id="greet-input" placeholder="Enter a name..." bind:value={name} />
-    <button type="submit">Greet</button>
-  </form>
-  <p>{greetMsg}</p>
-</main>
+  <!-- Middle: Album grid -->
+  <main class="content">
+    <div class="placeholder">
+      <p>No albums found</p>
+    </div>
+  </main>
+
+  <!-- Bottom: Controls bar -->
+  <footer class="footer">
+    <!-- Current track button -->
+    <button class="now-playing">
+      <div class="now-playing-art"></div>
+      <div class="now-playing-info">
+        <span class="now-playing-track">No track playing</span>
+        <span class="now-playing-artist">—</span>
+      </div>
+    </button>
+
+    <!-- PS2-style action hints -->
+    <div class="actions">
+      <div class="action-hint">
+        <span class="btn-icon cross">✕</span>
+        <span class="btn-label">Select</span>
+      </div>
+      <div class="action-hint">
+        <span class="btn-icon circle">○</span>
+        <span class="btn-label">Back</span>
+      </div>
+      <div class="action-hint">
+        <span class="btn-icon square">□</span>
+        <span class="btn-label">Shuffle</span>
+      </div>
+      <div class="action-hint">
+        <span class="btn-icon triangle">△</span>
+        <span class="btn-label">Options</span>
+      </div>
+    </div>
+  </footer>
+
+</div>
 
 <style>
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
-
-.logo.svelte-kit:hover {
-  filter: drop-shadow(0 0 2em #ff3e00);
-}
-
-:root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
-
-  color: #0f0f0f;
-  background-color: #f6f6f6;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
-}
-
-.container {
-  margin: 0;
-  padding-top: 10vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
-}
-
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
-}
-
-.row {
-  display: flex;
-  justify-content: center;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-
-a:hover {
-  color: #535bf2;
-}
-
-h1 {
-  text-align: center;
-}
-
-input,
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
-}
-
-button {
-  cursor: pointer;
-}
-
-button:hover {
-  border-color: #396cd8;
-}
-button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
-}
-
-input,
-button {
-  outline: none;
-}
-
-#greet-input {
-  margin-right: 5px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
+  .shell {
+    width: 100vw;
+    height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    padding: 28px 32px 20px;
+    gap: 0;
   }
 
-  a:hover {
-    color: #24c8db;
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding-bottom: 4px;
   }
 
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
+  .memory-card-label {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.02em;
   }
-  button:active {
-    background-color: #0f0f0f69;
-  }
-}
 
+  .library-size {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-secondary);
+    letter-spacing: 0.03em;
+  }
+
+  /* ── Content ── */
+  .content {
+    overflow-y: auto;
+    padding: 24px 0;
+  }
+
+  .placeholder {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 8px;
+  }
+
+  /* Now playing button */
+  .now-playing {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--card-bg);
+    border: none;
+    border-radius: 12px;
+    padding: 10px 16px 10px 10px;
+    cursor: pointer;
+    box-shadow: var(--btn-shadow);
+    backdrop-filter: blur(12px);
+    transition: box-shadow 0.2s, transform 0.15s;
+    max-width: 280px;
+  }
+
+  .now-playing:hover {
+    box-shadow: var(--card-shadow-hover);
+    transform: translateY(-1px);
+  }
+
+  .now-playing-art {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    background: rgba(90, 95, 120, 0.2);
+    flex-shrink: 0;
+  }
+
+  .now-playing-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .now-playing-track {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+  }
+
+  .now-playing-artist {
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  /* PS2 action hints */
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .action-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  }
+
+  .btn-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    letter-spacing: 0.03em;
+  }
+
+  /* PlayStation button colors */
+  .cross   { background: #4a90d9; color: #fff; }
+  .circle  { background: #d94a4a; color: #fff; }
+  .square  { background: #d94aaa; color: #fff; }
+  .triangle { background: #4aad6e; color: #fff; }
 </style>

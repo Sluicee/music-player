@@ -12,9 +12,11 @@
   "app": {
     "windows": [
       {
-        "title": "musicplayer",
-        "width": 800,
-        "height": 600
+        "title": "Music Player",
+        "width": 900,
+        "height": 900,
+        "resizable": false,
+        "center": true
       }
     ],
     "security": {
