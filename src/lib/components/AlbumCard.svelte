@@ -2,66 +2,42 @@
   import type { Album } from '../types';
 
   let { album, onclick }: { album: Album; onclick: () => void } = $props();
-
-  function formatDuration(secs: number): string {
-    const m = Math.floor(secs / 60);
-    const h = Math.floor(m / 60);
-    if (h > 0) return `${h}h ${m % 60}m`;
-    return `${m}m`;
-  }
 </script>
 
 <button class="card" {onclick}>
   <div class="art">
     {#if album.cover_art}
-      <img src={album.cover_art} alt={album.title} />
+      <img src={album.cover_art} alt={album.title} draggable="false" />
     {:else}
-      <div class="art-placeholder">
-        <span>♪</span>
-      </div>
+      <div class="art-placeholder">♪</div>
     {/if}
   </div>
-  <div class="info">
-    <span class="title">{album.title}</span>
-    <span class="artist">{album.artist}</span>
-    <span class="meta">
-      {album.tracks.length} tracks · {formatDuration(album.total_duration)}
-    </span>
-  </div>
+  <span class="title">{album.title}</span>
 </button>
 
 <style>
   .card {
-    background: var(--card-bg);
+    background: none;
     border: none;
-    border-radius: 12px;
-    padding: 10px;
     cursor: pointer;
-    text-align: left;
-    box-shadow: var(--card-shadow);
-    backdrop-filter: blur(10px);
-    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    align-items: center;
+    gap: 8px;
     width: 100%;
+    transition: transform 0.15s ease;
   }
 
-  .card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--card-shadow-hover);
-  }
-
-  .card:active {
-    transform: translateY(-1px);
-  }
+  .card:hover { transform: scale(1.04); }
+  .card:active { transform: scale(0.98); }
 
   .art {
     width: 100%;
     aspect-ratio: 1;
-    border-radius: 8px;
+    border-radius: 6px;
     overflow: hidden;
-    background: rgba(90, 95, 120, 0.12);
+    background: rgba(90, 95, 120, 0.15);
   }
 
   .art img {
@@ -77,38 +53,18 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 32px;
-    color: var(--text-dim);
-    opacity: 0.5;
-  }
-
-  .info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 0 2px 2px;
+    font-size: 28px;
+    color: rgba(90, 95, 120, 0.35);
   }
 
   .title {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--text-primary);
+    text-align: center;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  .artist {
-    font-size: 12px;
-    color: var(--text-secondary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .meta {
-    font-size: 11px;
-    color: var(--text-dim);
-    margin-top: 2px;
+    width: 100%;
   }
 </style>

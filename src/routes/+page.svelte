@@ -190,8 +190,10 @@
 
   /* ── Content ── */
   .content {
-    overflow-y: auto;
+    overflow: hidden;
     padding: 20px 0;
+    display: flex;
+    flex-direction: column;
   }
 
   .state-msg {
