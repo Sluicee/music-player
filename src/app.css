@@ -13,11 +13,20 @@
 }
 
 :root {
-  --bg: linear-gradient(to right, #dde0e8, #c9cdd9);
+  --bg: linear-gradient(to right, #e8ecf4 0%, #535353 100%);
 
-  --text-primary: #1c1e2a;
-  --text-secondary: #5a5f78;
-  --text-dim: #9098b0;
+  --text-primary:   #ffffff;
+  --text-secondary: #e8eaf0;
+  --text-dim:       #c0c4d4;
+
+  --text-shadow:
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000;
+
+  --track-active:  #caa700;
+  --track-hover:   #10aed2;
 
   --card-bg: rgba(255, 255, 255, 0.52);
   --card-shadow: 0 2px 18px rgba(60, 70, 110, 0.13);
@@ -42,7 +51,20 @@ html, body {
   background: var(--bg);
   color: var(--text-primary);
   font-family: var(--font);
-  font-weight: 400;
+  font-weight: 800;
+  text-shadow: var(--text-shadow);
   -webkit-font-smoothing: antialiased;
   user-select: none;
+}
+
+*, *::before, *::after {
+  font-weight: 800;
+  text-shadow: var(--text-shadow);
+}
+
+button, input, select, textarea {
+  font-family: var(--font);
+  font-weight: 800;
+  text-shadow: var(--text-shadow);
+  color: inherit;
 }

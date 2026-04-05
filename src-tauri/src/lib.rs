@@ -94,6 +94,11 @@ fn audio_is_finished(player: tauri::State<SharedPlayer>) -> bool {
     player.is_finished()
 }
 
+#[tauri::command]
+fn audio_get_position(player: tauri::State<SharedPlayer>) -> f64 {
+    player.get_position()
+}
+
 // ── App entry ─────────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -115,6 +120,7 @@ pub fn run() {
             audio_set_volume,
             audio_get_state,
             audio_is_finished,
+            audio_get_position,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

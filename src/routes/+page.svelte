@@ -3,6 +3,7 @@
   import AlbumGrid from '$lib/components/AlbumGrid.svelte';
   import AlbumView from '$lib/components/AlbumView.svelte';
   import VolumeControl from '$lib/components/VolumeControl.svelte';
+  import ProgressBar from '$lib/components/ProgressBar.svelte';
   import {
     albums,
     isScanning,
@@ -18,6 +19,8 @@
     isPaused,
     pause,
     resume,
+    playNext,
+    playPrev,
   } from '$lib/stores/player';
   import type { Album } from '$lib/types';
 
@@ -42,13 +45,14 @@
   <!-- Header -->
   <header class="header">
     <div class="header-left">
-      <button class="folder-btn" onclick={pickFolder} title="Choose music folder">
-        <span class="folder-icon">⊞</span>
-        <span class="memory-label">Memory Card</span>
-      </button>
-      {#if $librarySize !== '0 MB'}
-        <span class="lib-size">{$librarySize}</span>
-      {/if}
+      <div class="memory-block">
+        <button class="folder-btn" onclick={pickFolder} title="Choose music folder">
+          <span class="memory-label">Memory Card</span>
+        </button>
+        {#if $librarySize !== '0 MB'}
+          <span class="lib-size">{$librarySize}</span>
+        {/if}
+      </div>
     </div>
 
     <div class="header-right">
@@ -91,31 +95,53 @@
 
   <!-- Footer -->
   <footer class="footer">
-    <!-- Now playing -->
-    <button
-      class="now-playing"
-      class:active={!!$currentTrack}
-      onclick={openCurrentAlbum}
-      disabled={!$currentTrack}
-    >
-      <div class="now-playing-art">
-        {#if $currentAlbum?.cover_art}
-          <img src={$currentAlbum.cover_art} alt="" />
-        {:else}
-          <span>♪</span>
-        {/if}
+    <!-- Row 1: transport + progress, centered -->
+    <div class="footer-top">
+      <div class="transport">
+        <button
+          class="transport-btn"
+          onclick={() => $currentAlbum && playPrev($currentAlbum)}
+          disabled={!$currentTrack}
+          title="Previous"
+        >⏮</button>
+        <button
+          class="transport-btn play-btn"
+          onclick={() => $isPlaying ? pause() : resume()}
+          disabled={!$currentTrack}
+          title={$isPlaying ? 'Pause' : 'Play'}
+        >{$isPlaying ? '⏸' : '▶'}</button>
+        <button
+          class="transport-btn"
+          onclick={() => $currentAlbum && playNext($currentAlbum)}
+          disabled={!$currentTrack}
+          title="Next"
+        >⏭</button>
       </div>
-      <div class="now-playing-info">
-        <span class="track-name">{$currentTrack?.title ?? 'No track playing'}</span>
-        <span class="track-artist">{$currentTrack?.artist ?? '—'}</span>
-      </div>
-      {#if $currentTrack}
-        <span class="play-indicator">{$isPlaying ? '⏸' : '▶'}</span>
-      {/if}
-    </button>
+      <ProgressBar />
+      <VolumeControl />
+    </div>
 
-    <!-- Volume -->
-    <VolumeControl />
+    <!-- Row 2: now-playing | volume | hints -->
+    <div class="footer-bottom">
+      <!-- Now playing -->
+      <button
+        class="now-playing"
+        class:active={!!$currentTrack}
+        onclick={openCurrentAlbum}
+        disabled={!$currentTrack}
+      >
+        <div class="now-playing-art">
+          {#if $currentAlbum?.cover_art}
+            <img src={$currentAlbum.cover_art} alt="" />
+          {:else}
+            <span>♪</span>
+          {/if}
+        </div>
+        <div class="now-playing-info">
+          <span class="track-name">{$currentTrack?.title ?? 'No track playing'}</span>
+          <span class="track-artist">{$currentTrack?.artist ?? '—'}</span>
+        </div>
+      </button>
 
     <!-- PS2 action hints -->
     <div class="actions">
@@ -136,6 +162,7 @@
         <span class="btn-label">Options</span>
       </div>
     </div>
+    </div><!-- /footer-bottom -->
   </footer>
 
 </div>
@@ -156,15 +183,21 @@
   /* ── Header ── */
   .header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     padding-bottom: 4px;
+    min-height: 52px;
   }
 
   .header-left {
     display: flex;
-    align-items: baseline;
-    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .memory-block {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
 
   .folder-btn {
@@ -180,14 +213,9 @@
 
   .folder-btn:hover { opacity: 0.7; }
 
-  .folder-icon {
-    font-size: 16px;
-    color: var(--text-secondary);
-  }
-
   .memory-label {
     font-size: 22px;
-    font-weight: 600;
+
     color: var(--text-primary);
     letter-spacing: 0.01em;
   }
@@ -199,7 +227,7 @@
 
   .header-right {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 12px;
   }
 
@@ -207,13 +235,15 @@
     font-size: 12px;
     color: var(--text-dim);
     letter-spacing: 0.05em;
+    padding-top: 4px;
   }
 
   .hovered-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-primary);
+    font-size: 28px;
+    color: var(--track-active);
     letter-spacing: 0.01em;
+    white-space: nowrap;
+    line-height: 1;
     animation: fadein 0.15s ease;
   }
 
@@ -283,9 +313,23 @@
   /* ── Footer ── */
   .footer {
     display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 8px;
+  }
+
+  .footer-top {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 4px 0 2px;
+  }
+
+  .footer-bottom {
+    display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-top: 8px;
   }
 
   .now-playing {
@@ -338,7 +382,7 @@
 
   .track-name {
     font-size: 13px;
-    font-weight: 600;
+
     color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
@@ -351,12 +395,33 @@
     color: var(--text-secondary);
   }
 
-  .play-indicator {
+  /* Transport controls */
+  .transport {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .transport-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
     font-size: 14px;
     color: var(--text-secondary);
-    margin-left: 4px;
-    flex-shrink: 0;
+    padding: 4px 6px;
+    border-radius: 6px;
+    transition: color 0.15s, background 0.15s;
+    line-height: 1;
   }
+
+  .transport-btn:hover:not(:disabled) {
+    color: var(--track-hover);
+    background: none;
+  }
+
+  .transport-btn:disabled { opacity: 0.35; cursor: default; }
+
+  .play-btn { font-size: 16px; }
 
   /* PS2 buttons */
   .actions {
@@ -379,7 +444,7 @@
     align-items: center;
     justify-content: center;
     font-size: 11px;
-    font-weight: 600;
+
     flex-shrink: 0;
     box-shadow: 0 1px 4px rgba(0,0,0,0.18);
   }

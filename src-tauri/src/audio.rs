@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::sync::{Arc, Mutex};
 
 // Commands sent to the audio thread
@@ -22,6 +22,9 @@ struct Inner {
     current_path: Option<String>,
     duration_secs: f64,
     volume: f32,
+    // position tracking
+    play_started_at: Option<Instant>,
+    elapsed_before_pause: f64,
 }
 
 impl Inner {
@@ -32,7 +35,16 @@ impl Inner {
             current_path: None,
             duration_secs: 0.0,
             volume: 1.0,
+            play_started_at: None,
+            elapsed_before_pause: 0.0,
         }
+    }
+
+    fn position(&self) -> f64 {
+        let running = self.play_started_at
+            .map(|t| t.elapsed().as_secs_f64())
+            .unwrap_or(0.0);
+        (self.elapsed_before_pause + running).min(self.duration_secs)
     }
 }
 
@@ -43,6 +55,7 @@ pub struct PlaybackState {
     pub current_path: Option<String>,
     pub duration_secs: f64,
     pub volume: f32,
+    pub position_secs: f64,
 }
 
 // AudioPlayer lives in the main thread and is Send+Sync:
@@ -89,7 +102,6 @@ impl AudioPlayer {
                 let Some(cmd) = cmd else { continue };
                 match cmd {
                     Cmd::Play { path, duration } => {
-                        // Drop previous sink
                         if let Some(s) = sink.take() {
                             s.stop();
                         }
@@ -105,6 +117,8 @@ impl AudioPlayer {
                                         st.is_paused = false;
                                         st.current_path = Some(path);
                                         st.duration_secs = duration;
+                                        st.play_started_at = Some(Instant::now());
+                                        st.elapsed_before_pause = 0.0;
                                         sink = Some(s);
                                     }
                                     Err(_) => {}
@@ -118,6 +132,11 @@ impl AudioPlayer {
                         if let Some(s) = &sink {
                             s.pause();
                             let mut st = state_thread.lock().unwrap();
+                            let running = st.play_started_at
+                                .map(|t| t.elapsed().as_secs_f64())
+                                .unwrap_or(0.0);
+                            st.elapsed_before_pause += running;
+                            st.play_started_at = None;
                             st.is_playing = false;
                             st.is_paused = true;
                         }
@@ -126,6 +145,7 @@ impl AudioPlayer {
                         if let Some(s) = &sink {
                             s.play();
                             let mut st = state_thread.lock().unwrap();
+                            st.play_started_at = Some(Instant::now());
                             st.is_playing = true;
                             st.is_paused = false;
                         }
@@ -139,6 +159,8 @@ impl AudioPlayer {
                         st.is_paused = false;
                         st.current_path = None;
                         st.duration_secs = 0.0;
+                        st.play_started_at = None;
+                        st.elapsed_before_pause = 0.0;
                     }
                     Cmd::SetVolume(v) => {
                         let vol = v.clamp(0.0, 1.0);
@@ -184,6 +206,10 @@ impl AudioPlayer {
         !st.is_playing && !st.is_paused && st.current_path.is_some()
     }
 
+    pub fn get_position(&self) -> f64 {
+        self.state.lock().unwrap().position()
+    }
+
     pub fn get_state(&self) -> PlaybackState {
         let st = self.state.lock().unwrap();
         PlaybackState {
@@ -192,6 +218,7 @@ impl AudioPlayer {
             current_path: st.current_path.clone(),
             duration_secs: st.duration_secs,
             volume: st.volume,
+            position_secs: st.position(),
         }
     }
 }

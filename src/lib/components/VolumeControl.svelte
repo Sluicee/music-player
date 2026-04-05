@@ -42,8 +42,9 @@
 
   .vol-label {
     font-size: 10px;
-    font-weight: 600;
+    font-weight: 800;
     color: var(--text-dim);
+    text-shadow: var(--text-shadow);
     letter-spacing: 0.08em;
     padding-bottom: 1px;
   }
@@ -75,7 +76,9 @@
 
   .vol-num {
     font-size: 10px;
+    font-weight: 800;
     color: var(--text-dim);
+    text-shadow: var(--text-shadow);
     padding-bottom: 1px;
     min-width: 20px;
   }

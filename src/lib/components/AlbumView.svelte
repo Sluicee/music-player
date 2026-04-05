@@ -5,10 +5,13 @@
     isPlaying,
     playTrack,
     playShuffled,
+    playNext,
+    playPrev,
     pause,
     resume,
   } from '../stores/player';
   import VolumeControl from './VolumeControl.svelte';
+  import SpinningCover from './SpinningCover.svelte';
 
   let {
     album,
@@ -43,7 +46,7 @@
         for (let i = 0; i < data.length; i += 4) {
           r += data[i]; g += data[i + 1]; b += data[i + 2];
         }
-        resolve(`rgba(${Math.round(r/px)}, ${Math.round(g/px)}, ${Math.round(b/px)}, 0.3)`);
+        resolve(`rgba(${Math.round(r/px)}, ${Math.round(g/px)}, ${Math.round(b/px)}, 0.5)`);
       };
       img.src = src;
     });
@@ -81,13 +84,11 @@
   <div class="view">
 
     <!-- Always-spinning cover -->
-    <div class="cover-art">
-      {#if album.cover_art}
-        <img src={album.cover_art} alt={album.title} draggable="false" />
-      {:else}
-        <div class="cover-placeholder">♪</div>
-      {/if}
-    </div>
+    {#if album.cover_art}
+      <SpinningCover src={album.cover_art} alt={album.title} />
+    {:else}
+      <div class="cover-placeholder">♪</div>
+    {/if}
 
     <!-- Info + tracklist only -->
     <div class="panel">
@@ -135,6 +136,17 @@
     </button>
 
     <div class="hints-sep"></div>
+
+    <button class="hint-btn" onclick={() => playPrev(album)} disabled={!$currentTrack}>
+      <span class="nav-icon">⏮</span>
+      <span>Prev</span>
+    </button>
+    <button class="hint-btn" onclick={() => playNext(album)} disabled={!$currentTrack}>
+      <span class="nav-icon">⏭</span>
+      <span>Next</span>
+    </button>
+
+    <div class="hints-sep"></div>
     <VolumeControl />
   </div>
 </div>
@@ -143,7 +155,6 @@
   .overlay {
     position: fixed;
     inset: 0;
-    backdrop-filter: blur(2px);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -170,37 +181,17 @@
     to   { opacity: 1; transform: perspective(900px) rotateY(0deg) scale(1); }
   }
 
-  /* ── Cover ── */
-  .cover-art {
+  /* ── Cover placeholder (no art) ── */
+  .cover-placeholder {
     width: 260px;
     height: 260px;
     flex-shrink: 0;
-    background: rgba(90, 95, 120, 0.18);
-    overflow: hidden;
-    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.3);
-    animation: spin-y 5s linear infinite;
-  }
-
-  @keyframes spin-y {
-    from { transform: rotateY(0deg); }
-    to   { transform: rotateY(360deg); }
-  }
-
-  .cover-art img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-
-  .cover-placeholder {
-    width: 100%;
-    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 64px;
     color: rgba(90, 95, 120, 0.3);
+    background: rgba(90, 95, 120, 0.18);
   }
 
   /* ── Panel ── */
@@ -211,12 +202,11 @@
     width: 280px;
   }
 
-  .album-meta { display: flex; flex-direction: column; gap: 3px; }
+  .album-meta { display: flex; flex-direction: column; gap: 3px; align-items: center; text-align: center; }
 
   .album-title {
     font-size: 19px;
-    font-weight: 600;
-    color: var(--text-primary);
+    color: var(--track-active);
     line-height: 1.2;
     margin: 0;
   }
@@ -249,8 +239,11 @@
     transition: background 0.1s;
   }
 
-  .track-btn:hover { background: rgba(255,255,255,0.28); }
-  .track.active .track-btn { background: rgba(255,255,255,0.4); }
+  .track-btn:hover .track-title,
+  .track-btn:hover .track-num,
+  .track-btn:hover .track-dur { color: var(--track-hover); }
+
+  .track.active .track-btn { background: none; }
 
   .track-num {
     font-size: 10px;
@@ -258,9 +251,10 @@
     width: 18px;
     flex-shrink: 0;
     text-align: right;
+    transition: color 0.12s;
   }
 
-  .playing-dot { color: var(--text-secondary); font-size: 9px; }
+  .playing-dot { color: var(--track-active); font-size: 9px; }
 
   .track-title {
     flex: 1;
@@ -269,10 +263,14 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    transition: color 0.12s;
   }
 
-  .track.active .track-title { font-weight: 600; }
-  .track-dur { font-size: 10px; color: var(--text-dim); flex-shrink: 0; }
+  .track.active .track-title,
+  .track.active .track-num,
+  .track.active .track-dur { color: var(--track-active); }
+
+  .track-dur { font-size: 10px; color: var(--text-dim); flex-shrink: 0; transition: color 0.12s; }
 
   /* ── Bottom hints ── */
   .hints {
@@ -301,7 +299,10 @@
     transition: color 0.15s;
   }
 
-  .hint-btn:hover { color: var(--text-primary); }
+  .hint-btn:hover:not(:disabled) { color: var(--text-primary); }
+  .hint-btn:disabled { opacity: 0.35; cursor: default; }
+
+  .nav-icon { font-size: 13px; }
 
   .btn-icon {
     width: 20px;
@@ -311,7 +312,7 @@
     align-items: center;
     justify-content: center;
     font-size: 10px;
-    font-weight: 600;
+
     box-shadow: 0 1px 3px rgba(0,0,0,0.18);
   }
 

@@ -38,8 +38,8 @@
     cursor: pointer;
     padding: 0;
     display: flex;
-    flex-direction: column;
     align-items: center;
+    justify-content: center;
     width: 140px;
     flex-shrink: 0;
   }
@@ -56,6 +56,9 @@
     background: rgba(90, 95, 120, 0.18);
     overflow: hidden;
     box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.22);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .art img {
@@ -66,13 +69,9 @@
   }
 
   .art-placeholder {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 28px;
-    color: rgba(90, 95, 120, 0.3);
+    font-size: 52px;
+    color: rgba(90, 95, 120, 0.45);
+    text-align: center;
   }
 
   .edge-r {
