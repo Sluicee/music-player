@@ -40,14 +40,14 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 140px;
+    width: 93px;
     flex-shrink: 0;
   }
 
   .art-wrap {
     position: relative;
-    width: 140px;
-    height: 140px;
+    width: 93px;
+    height: 93px;
   }
 
   .art {
@@ -69,7 +69,7 @@
   }
 
   .art-placeholder {
-    font-size: 52px;
+    font-size: 34px;
     color: rgba(90, 95, 120, 0.45);
     text-align: center;
   }
@@ -77,9 +77,9 @@
   .edge-r {
     position: absolute;
     top: 0;
-    left: 140px;
-    width: 6px;
-    height: 140px;
+    left: 93px;
+    width: 4px;
+    height: 93px;
     background: linear-gradient(to right,
       rgba(10, 10, 22, 0.55),
       rgba(10, 10, 22, 0.25)
@@ -88,10 +88,10 @@
 
   .edge-b {
     position: absolute;
-    top: 140px;
+    top: 93px;
     left: 0;
-    width: 146px;
-    height: 5px;
+    width: 97px;
+    height: 4px;
     background: linear-gradient(to bottom,
       rgba(10, 10, 22, 0.50),
       rgba(10, 10, 22, 0.20)

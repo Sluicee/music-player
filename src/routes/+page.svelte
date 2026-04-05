@@ -57,11 +57,13 @@
   }
 </script>
 
+<div class="root">
 <div class="shell">
 
   <!-- Header -->
   <header class="header">
     <div class="header-left">
+      <div class="mc-card"></div>
       <div class="memory-block">
         <span class="memory-label">Memory Card</span>
         {#if $librarySize !== '0 MB'}
@@ -190,14 +192,26 @@
   <OptionsMenu onclose={() => optionsOpen = false} />
 {/if}
 
+</div><!-- /root -->
+
 <style>
+  .root {
+    width: calc(100vw / 1.5);
+    height: calc(100vh / 1.5);
+    transform: scale(1.5);
+    transform-origin: top left;
+    position: relative;
+    overflow: hidden;
+    filter: saturate(0.82) contrast(1.08) brightness(0.97) blur(0.4px);
+    image-rendering: crisp-edges;
+  }
+
   .shell {
-    width: 100vw;
-    height: 100vh;
+    width: 100%;
+    height: 100%;
     display: grid;
     grid-template-rows: auto 1fr auto;
-    padding: 18px 24px 14px;
-    filter: saturate(0.82) contrast(1.08) brightness(0.97);
+    padding: 12px 16px 10px;
   }
 
   /* ── Header ── */
@@ -211,7 +225,18 @@
 
   .header-left {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* ── PS2 Memory Card ── */
+  .mc-card {
+    width: 33px;
+    height: 44px;
+    background: #474747;
+    border-radius: 2px;
+    flex-shrink: 0;
+    box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
   }
 
   .memory-block {
@@ -351,16 +376,16 @@
   .now-playing {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 7px;
     background: var(--card-bg);
     border: none;
-    border-radius: 12px;
-    padding: 10px 14px 10px 10px;
+    border-radius: 8px;
+    padding: 6px 10px 6px 6px;
     cursor: pointer;
     box-shadow: var(--btn-shadow);
     backdrop-filter: blur(12px);
     transition: box-shadow 0.2s, transform 0.15s, opacity 0.2s;
-    max-width: 280px;
+    max-width: 180px;
   }
 
   .now-playing:disabled { opacity: 0.45; cursor: default; }
@@ -370,9 +395,9 @@
   }
 
   .now-playing-art {
-    width: 40px;
-    height: 40px;
-    border-radius: 7px;
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
     background: rgba(90, 95, 120, 0.15);
     flex-shrink: 0;
     overflow: hidden;

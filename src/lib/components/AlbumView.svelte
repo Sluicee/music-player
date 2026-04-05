@@ -154,7 +154,7 @@
 
 <style>
   .overlay {
-    position: fixed;
+    position: absolute;
     inset: 0;
     display: flex;
     flex-direction: column;
@@ -172,7 +172,7 @@
 
   .view {
     display: flex;
-    gap: 44px;
+    gap: 10px;
     align-items: flex-start;
     animation: slide-in 0.32s cubic-bezier(0.34, 1.4, 0.64, 1);
   }

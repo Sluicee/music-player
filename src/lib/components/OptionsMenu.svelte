@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
-  import { scanFolder, refreshLibrary, clearLibrary, folderPath } from '../stores/library';
+  import { scanFolder, refreshLibrary, clearLibrary } from '../stores/library';
   import PS2Btn from './PS2Btn.svelte';
 
   let { onclose }: { onclose: () => void } = $props();
@@ -24,9 +24,9 @@
   }
 
   const items = [
-    { label: 'Добавить папку в библиотеку', action: addFolder },
-    { label: 'Обновить библиотеку',         action: refresh  },
-    { label: 'Очистить библиотеку',         action: clear    },
+    { label: 'Add new folder', action: addFolder },
+    { label: 'Refresh library',         action: refresh  },
+    { label: 'Clear library',         action: clear    },
   ];
 </script>
 
@@ -46,14 +46,14 @@
   <div class="close-hint">
     <button class="hint-btn" onclick={onclose}>
       <PS2Btn type="circle" />
-      <span>Закрыть</span>
+      <span>Close</span>
     </button>
   </div>
 </div>
 
 <style>
   .overlay {
-    position: fixed;
+    position: absolute;
     inset: 0;
     background: rgba(0, 0, 0, 0.72);
     backdrop-filter: blur(3px);

@@ -100,8 +100,8 @@
 
   .grid {
     display: grid;
-    grid-template-columns: repeat(4, 140px);
+    grid-template-columns: repeat(4, 93px);
     grid-template-rows: repeat(3, auto);
-    gap: 34px 44px;
+    gap: 22px 30px;
   }
 </style>

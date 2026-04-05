@@ -34,8 +34,8 @@
   }
 
   .bar {
-    width: 320px;
-    height: 4px;
+    width: 200px;
+    height: 3px;
     background: rgba(90, 95, 120, 0.25);
     border-radius: 2px;
     overflow: hidden;
