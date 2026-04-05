@@ -2,8 +2,9 @@ mod audio;
 mod scanner;
 
 use audio::{create_player, PlaybackState, SharedPlayer};
-use scanner::{calculate_library_size, scan_folder_streaming, Album};
+use scanner::{calculate_library_size, scan_folder_streaming};
 use tauri_plugin_dialog::DialogExt;
+use tauri::{Manager, Emitter};
 
 // ── Dialog command ────────────────────────────────────────────────────────────
 
@@ -51,6 +52,45 @@ fn format_size(bytes: u64) -> String {
     } else {
         format!("{:.0} MB", bytes as f64 / MB as f64)
     }
+}
+
+// ── Library cache commands ────────────────────────────────────────────────────
+
+#[tauri::command]
+fn save_library_cache(data: String, app: tauri::AppHandle) -> Result<(), String> {
+    let path = app.path().app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("library_cache.json");
+    std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
+    std::fs::write(&path, data).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn load_library_cache(app: tauri::AppHandle) -> Result<bool, String> {
+    let path = app.path().app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("library_cache.json");
+
+    let data = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(_) => return Ok(false),
+    };
+
+    let albums: Vec<serde_json::Value> = match serde_json::from_str(&data) {
+        Ok(v) => v,
+        Err(e) => return Err(e.to_string()),
+    };
+
+    if albums.is_empty() {
+        return Ok(false);
+    }
+
+    for album in albums {
+        app.emit("scan:album", &album).ok();
+    }
+    app.emit("scan:done", ()).ok();
+
+    Ok(true)
 }
 
 // ── Audio commands ────────────────────────────────────────────────────────────
@@ -121,6 +161,8 @@ pub fn run() {
             audio_get_state,
             audio_is_finished,
             audio_get_position,
+            save_library_cache,
+            load_library_cache,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

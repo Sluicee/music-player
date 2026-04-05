@@ -5,12 +5,14 @@
   import ProgressBar from '$lib/components/ProgressBar.svelte';
   import PS2Btn from '$lib/components/PS2Btn.svelte';
   import OptionsMenu from '$lib/components/OptionsMenu.svelte';
+  import { onMount } from 'svelte';
   import {
     albums,
     isScanning,
     librarySize,
     selectedAlbum,
     scanStatus,
+    loadCache,
   } from '$lib/stores/library';
   import {
     currentTrack,
@@ -21,11 +23,30 @@
     resume,
     playNext,
     playPrev,
+    initVolume,
+    loadLastTrack,
   } from '$lib/stores/player';
+  import { currentTrack as ct, currentAlbum as ca, duration } from '$lib/stores/player';
   import type { Album } from '$lib/types';
 
   let hoveredAlbum = $state<Album | null>(null);
-  let optionsOpen = $state(false);
+  let optionsOpen  = $state(false);
+
+  onMount(async () => {
+    // Restore volume to audio backend
+    await initVolume();
+
+    // Restore last track display (no autoplay)
+    const last = loadLastTrack();
+    if (last) {
+      ct.set(last.track);
+      ca.set(last.album);
+      duration.set(last.track.duration);
+    }
+
+    // Load cached library (no rescan)
+    await loadCache();
+  });
 
   function selectAlbum(album: Album) {
     selectedAlbum.set(album);
@@ -74,7 +95,7 @@
       </div>
     {:else if $albums.length === 0}
       <div class="state-msg">
-        <p class="hint">Click <strong>Memory Card</strong> to choose a music folder</p>
+        <p class="hint">Select <strong>Options</strong> to choose a music folder</p>
       </div>
     {:else}
       {#if $isScanning}

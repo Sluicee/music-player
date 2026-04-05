@@ -2,13 +2,40 @@ import { writable, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
 import type { Track, Album } from '../types';
 
-export const currentTrack  = writable<Track | null>(null);
-export const currentAlbum  = writable<Album | null>(null);
-export const isPlaying     = writable(false);
-export const isPaused      = writable(false);
-export const volume        = writable(1.0);
-export const position      = writable(0);   // seconds elapsed
-export const duration      = writable(0);   // total seconds
+const VOL_KEY   = 'mp_volume';
+const TRACK_KEY = 'mp_last_track';
+
+function loadVolume(): number {
+  const v = parseFloat(localStorage.getItem(VOL_KEY) ?? '');
+  return isNaN(v) ? 1.0 : Math.max(0, Math.min(1, v));
+}
+
+function saveVolume(v: number) {
+  localStorage.setItem(VOL_KEY, String(v));
+}
+
+function saveLastTrack(track: Track | null, album: Album | null) {
+  if (track && album) {
+    localStorage.setItem(TRACK_KEY, JSON.stringify({ track, album }));
+  } else {
+    localStorage.removeItem(TRACK_KEY);
+  }
+}
+
+export function loadLastTrack(): { track: Track; album: Album } | null {
+  try {
+    const raw = localStorage.getItem(TRACK_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+export const currentTrack = writable<Track | null>(null);
+export const currentAlbum = writable<Album | null>(null);
+export const isPlaying    = writable(false);
+export const isPaused     = writable(false);
+export const volume       = writable(loadVolume());
+export const position     = writable(0);
+export const duration     = writable(0);
 
 // ── Polling ───────────────────────────────────────────────────────────────────
 
@@ -17,14 +44,9 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 function startPolling() {
   if (pollTimer) return;
   pollTimer = setInterval(async () => {
-    const track = get(currentTrack);
-    if (!track) return;
-
-    const pos = await invoke<number>('audio_get_position');
-    position.set(pos);
-
-    const finished = await invoke<boolean>('audio_is_finished');
-    if (finished) {
+    if (!get(currentTrack)) return;
+    position.set(await invoke<number>('audio_get_position'));
+    if (await invoke<boolean>('audio_is_finished')) {
       const album = get(currentAlbum);
       if (album) await playNext(album);
     }
@@ -46,6 +68,7 @@ export async function playTrack(track: Track, album: Album) {
     position.set(0);
     isPlaying.set(true);
     isPaused.set(false);
+    saveLastTrack(track, album);
     startPolling();
   } catch (e) {
     console.error('Play failed:', e);
@@ -70,11 +93,13 @@ export async function stop() {
   isPaused.set(false);
   currentTrack.set(null);
   position.set(0);
+  saveLastTrack(null, null);
   stopPolling();
 }
 
 export async function setVolume(v: number) {
   volume.set(v);
+  saveVolume(v);
   await invoke('audio_set_volume', { volume: v });
 }
 
@@ -89,9 +114,7 @@ export async function playNext(album: Album) {
 export async function playPrev(album: Album) {
   const track = get(currentTrack);
   if (!track) return;
-  const pos = get(position);
-  // if >3s in — restart; otherwise go to previous
-  if (pos > 3) {
+  if (get(position) > 3) {
     await invoke('audio_play', { path: track.path, duration: track.duration });
     position.set(0);
     return;
@@ -104,4 +127,10 @@ export async function playPrev(album: Album) {
 export async function playShuffled(album: Album) {
   const shuffled = [...album.tracks].sort(() => Math.random() - 0.5);
   if (shuffled.length > 0) await playTrack(shuffled[0], album);
+}
+
+// Apply saved volume to audio backend
+export async function initVolume() {
+  const v = get(volume);
+  await invoke('audio_set_volume', { volume: v });
 }
