@@ -81,16 +81,12 @@
   <div class="view">
 
     <!-- Always-spinning cover -->
-    <div class="cover-wrap">
-      <div class="cover-art">
-        {#if album.cover_art}
-          <img src={album.cover_art} alt={album.title} draggable="false" />
-        {:else}
-          <div class="cover-placeholder">♪</div>
-        {/if}
-      </div>
-      <div class="cover-edge-r"></div>
-      <div class="cover-edge-b"></div>
+    <div class="cover-art">
+      {#if album.cover_art}
+        <img src={album.cover_art} alt={album.title} draggable="false" />
+      {:else}
+        <div class="cover-placeholder">♪</div>
+      {/if}
     </div>
 
     <!-- Info + tracklist only -->
@@ -175,21 +171,14 @@
   }
 
   /* ── Cover ── */
-  .cover-wrap {
-    position: relative;
+  .cover-art {
     width: 260px;
     height: 260px;
     flex-shrink: 0;
-  }
-
-  /* Always spinning */
-  .cover-art {
-    position: absolute;
-    inset: 0;
     background: rgba(90, 95, 120, 0.18);
     overflow: hidden;
-    box-shadow: 2px 4px 14px rgba(0, 0, 0, 0.25);
-    animation: spin-y 12s linear infinite;
+    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.3);
+    animation: spin-y 5s linear infinite;
   }
 
   @keyframes spin-y {
@@ -212,24 +201,6 @@
     justify-content: center;
     font-size: 64px;
     color: rgba(90, 95, 120, 0.3);
-  }
-
-  .cover-edge-r {
-    position: absolute;
-    top: 0;
-    left: 260px;
-    width: 10px;
-    height: 260px;
-    background: linear-gradient(to right, rgba(10,10,22,0.5), rgba(10,10,22,0.2));
-  }
-
-  .cover-edge-b {
-    position: absolute;
-    top: 260px;
-    left: 0;
-    width: 270px;
-    height: 8px;
-    background: linear-gradient(to bottom, rgba(10,10,22,0.45), rgba(10,10,22,0.15));
   }
 
   /* ── Panel ── */
