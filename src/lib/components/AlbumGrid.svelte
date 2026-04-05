@@ -98,10 +98,8 @@
 
   .grid {
     display: grid;
-    grid-template-columns: repeat(4, 150px);
+    grid-template-columns: repeat(4, 120px);
     grid-template-rows: repeat(3, auto);
-    gap: 28px 24px;
-    transform: perspective(1000px) rotateX(12deg);
-    transform-origin: center 30%;
+    gap: 34px 44px;
   }
 </style>
