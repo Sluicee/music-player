@@ -178,6 +178,7 @@
     display: grid;
     grid-template-rows: auto 1fr auto;
     padding: 18px 24px 14px;
+    filter: saturate(0.82) contrast(1.08) brightness(0.97);
   }
 
   /* ── Header ── */
