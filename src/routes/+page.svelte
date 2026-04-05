@@ -4,6 +4,7 @@
   import AlbumView from '$lib/components/AlbumView.svelte';
   import VolumeControl from '$lib/components/VolumeControl.svelte';
   import ProgressBar from '$lib/components/ProgressBar.svelte';
+  import PS2Btn from '$lib/components/PS2Btn.svelte';
   import {
     albums,
     isScanning,
@@ -146,19 +147,19 @@
     <!-- PS2 action hints -->
     <div class="actions">
       <div class="action-hint">
-        <span class="btn-icon cross">✕</span>
+        <PS2Btn type="cross" />
         <span class="btn-label">Select</span>
       </div>
       <div class="action-hint">
-        <span class="btn-icon circle">○</span>
+        <PS2Btn type="circle" />
         <span class="btn-label">Back</span>
       </div>
       <div class="action-hint">
-        <span class="btn-icon square">□</span>
+        <PS2Btn type="square" />
         <span class="btn-label">Shuffle</span>
       </div>
       <div class="action-hint">
-        <span class="btn-icon triangle">△</span>
+        <PS2Btn type="triangle" />
         <span class="btn-label">Options</span>
       </div>
     </div>
@@ -437,27 +438,9 @@
     gap: 6px;
   }
 
-  .btn-icon {
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-
-    flex-shrink: 0;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.18);
-  }
-
   .btn-label {
     font-size: 11px;
     color: var(--text-secondary);
     letter-spacing: 0.03em;
   }
-
-  .cross    { background: #4a90d9; color: #fff; }
-  .circle   { background: #d94a4a; color: #fff; }
-  .square   { background: #d94aaa; color: #fff; }
-  .triangle { background: #4aad6e; color: #fff; }
 </style>

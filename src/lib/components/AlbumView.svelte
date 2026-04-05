@@ -12,6 +12,7 @@
   } from '../stores/player';
   import VolumeControl from './VolumeControl.svelte';
   import SpinningCover from './SpinningCover.svelte';
+  import PS2Btn from './PS2Btn.svelte';
 
   let {
     album,
@@ -123,15 +124,15 @@
   <!-- Bottom: gamepad hints (functional) + volume -->
   <div class="hints">
     <button class="hint-btn" onclick={onclose}>
-      <span class="btn-icon circle">○</span>
+      <PS2Btn type="circle" />
       <span>Back</span>
     </button>
     <button class="hint-btn" onclick={handlePlayPause}>
-      <span class="btn-icon cross">✕</span>
+      <PS2Btn type="cross" />
       <span>{isActiveAlbum && $isPlaying ? 'Pause' : 'Play'}</span>
     </button>
     <button class="hint-btn" onclick={() => playShuffled(album)}>
-      <span class="btn-icon square">□</span>
+      <PS2Btn type="square" />
       <span>Shuffle</span>
     </button>
 
@@ -304,19 +305,4 @@
 
   .nav-icon { font-size: 13px; }
 
-  .btn-icon {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 10px;
-
-    box-shadow: 0 1px 3px rgba(0,0,0,0.18);
-  }
-
-  .cross  { background: #4a90d9; color: #fff; }
-  .circle { background: #d94a4a; color: #fff; }
-  .square { background: #d94aaa; color: #fff; }
 </style>
