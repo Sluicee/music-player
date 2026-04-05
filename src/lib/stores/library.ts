@@ -13,6 +13,19 @@ export const scanStatus = writable({ filesScanned: 0, albumsFound: 0 });
 
 export const albumCount = derived(albums, ($a) => $a.length);
 
+export async function refreshLibrary() {
+  const { get } = await import('svelte/store');
+  const path = get(folderPath);
+  if (path) await scanFolder(path);
+}
+
+export function clearLibrary() {
+  albums.set([]);
+  librarySize.set('');
+  folderPath.set(null);
+  scanStatus.set({ filesScanned: 0, albumsFound: 0 });
+}
+
 export async function scanFolder(path: string) {
   isScanning.set(true);
   folderPath.set(path);

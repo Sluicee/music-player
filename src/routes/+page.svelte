@@ -1,17 +1,16 @@
 <script lang="ts">
-  import { invoke } from '@tauri-apps/api/core';
   import AlbumGrid from '$lib/components/AlbumGrid.svelte';
   import AlbumView from '$lib/components/AlbumView.svelte';
   import VolumeControl from '$lib/components/VolumeControl.svelte';
   import ProgressBar from '$lib/components/ProgressBar.svelte';
   import PS2Btn from '$lib/components/PS2Btn.svelte';
+  import OptionsMenu from '$lib/components/OptionsMenu.svelte';
   import {
     albums,
     isScanning,
     librarySize,
     selectedAlbum,
     scanStatus,
-    scanFolder,
   } from '$lib/stores/library';
   import {
     currentTrack,
@@ -26,11 +25,7 @@
   import type { Album } from '$lib/types';
 
   let hoveredAlbum = $state<Album | null>(null);
-
-  async function pickFolder() {
-    const path = await invoke<string | null>('pick_folder');
-    if (path) await scanFolder(path);
-  }
+  let optionsOpen = $state(false);
 
   function selectAlbum(album: Album) {
     selectedAlbum.set(album);
@@ -47,9 +42,7 @@
   <header class="header">
     <div class="header-left">
       <div class="memory-block">
-        <button class="folder-btn" onclick={pickFolder} title="Choose music folder">
-          <span class="memory-label">Memory Card</span>
-        </button>
+        <span class="memory-label">Memory Card</span>
         {#if $librarySize !== '0 MB'}
           <span class="lib-size">{$librarySize}</span>
         {/if}
@@ -158,10 +151,10 @@
         <PS2Btn type="square" />
         <span class="btn-label">Shuffle</span>
       </div>
-      <div class="action-hint">
+      <button class="action-hint action-btn" onclick={() => optionsOpen = true}>
         <PS2Btn type="triangle" />
         <span class="btn-label">Options</span>
-      </div>
+      </button>
     </div>
     </div><!-- /footer-bottom -->
   </footer>
@@ -170,6 +163,10 @@
 
 {#if $selectedAlbum}
   <AlbumView album={$selectedAlbum} onclose={() => selectedAlbum.set(null)} />
+{/if}
+
+{#if optionsOpen}
+  <OptionsMenu onclose={() => optionsOpen = false} />
 {/if}
 
 <style>
@@ -202,18 +199,14 @@
     gap: 2px;
   }
 
-  .folder-btn {
+  .action-btn {
     background: none;
     border: none;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 8px;
     padding: 0;
     transition: opacity 0.15s;
   }
-
-  .folder-btn:hover { opacity: 0.7; }
+  .action-btn:hover { opacity: 0.75; }
 
   .memory-label {
     font-size: 22px;
