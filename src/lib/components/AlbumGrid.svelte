@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Album } from '../types';
   import AlbumCard from './AlbumCard.svelte';
+  import { playUiSfx } from '$lib/ui-sfx';
 
   const COLS = 4;
   const ROWS = 3;
@@ -33,11 +34,17 @@
   });
 
   function nextPage() {
-    if (currentPage < totalPages - 1) currentPage++;
+    if (currentPage < totalPages - 1) {
+      playUiSfx('nextPrev');
+      currentPage++;
+    }
   }
 
   function prevPage() {
-    if (currentPage > 0) currentPage--;
+    if (currentPage > 0) {
+      playUiSfx('nextPrev');
+      currentPage--;
+    }
   }
 
   function onWheel(e: WheelEvent) {

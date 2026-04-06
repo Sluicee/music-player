@@ -14,6 +14,7 @@
   import VolumeControl from './VolumeControl.svelte';
   import SpinningCover from './SpinningCover.svelte';
   import PS2Btn from './PS2Btn.svelte';
+  import { playUiSfx } from '$lib/ui-sfx';
 
   let {
     album,
@@ -72,6 +73,7 @@
     if ($currentTrack?.id === track.id) {
       if ($isPlaying) await pause(); else await resume();
     } else {
+      playUiSfx('confirm');
       await playTrack(track, album);
     }
   }
@@ -81,13 +83,37 @@
     else if ($isPlaying) await pause();
     else await resume();
   }
+
+  async function handlePrev() {
+    playUiSfx('nextPrev');
+    await playPrev(album);
+  }
+
+  async function handleNext() {
+    playUiSfx('nextPrev');
+    await playNext(album);
+  }
+
+  async function handleShuffle() {
+    playUiSfx('confirm');
+    await playShuffled(album);
+  }
+
+  function handleClose() {
+    playUiSfx('back');
+    onclose();
+  }
+
+  function handleOverlayMouseDown(e: MouseEvent) {
+    if (e.target === e.currentTarget) handleClose();
+  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="overlay"
   style="background: {tintColor};"
-  onmousedown={(e) => e.target === e.currentTarget && onclose()}
+  onmousedown={handleOverlayMouseDown}
 >
   <div class="view">
 
@@ -131,7 +157,7 @@
   <!-- Bottom: gamepad hints (functional) + volume -->
   <div class="hints">
     <div class="hints-row">
-      <button class="hint-btn" onclick={onclose}>
+      <button class="hint-btn" onclick={handleClose}>
         <PS2Btn type="circle" />
         <span>Back</span>
       </button>
@@ -139,19 +165,19 @@
         <PS2Btn type="cross" />
         <span>{isActiveAlbum && $isPlaying ? 'Pause' : 'Play'}</span>
       </button>
-      <button class="hint-btn" onclick={() => playShuffled(album)}>
+      <button class="hint-btn" onclick={handleShuffle}>
         <PS2Btn type="square" />
         <span>Shuffle</span>
       </button>
 
       <div class="hints-sep"></div>
 
-      <button class="hint-btn hint-btn--shoulder" onclick={() => playPrev(album)} disabled={!$currentTrack}>
+      <button class="hint-btn hint-btn--shoulder" onclick={handlePrev} disabled={!$currentTrack}>
         <span class="shoulder-tag">L1</span>
         <span class="nav-icon">&lt;&lt;</span>
         <span>Prev</span>
       </button>
-      <button class="hint-btn hint-btn--shoulder" onclick={() => playNext(album)} disabled={!$currentTrack}>
+      <button class="hint-btn hint-btn--shoulder" onclick={handleNext} disabled={!$currentTrack}>
         <span class="shoulder-tag">R1</span>
         <span class="nav-icon">&gt;&gt;</span>
         <span>Next</span>

@@ -7,6 +7,7 @@
   import PS2Btn from '$lib/components/PS2Btn.svelte';
   import OptionsMenu from '$lib/components/OptionsMenu.svelte';
   import StatsView from '$lib/components/StatsView.svelte';
+  import { playUiSfx, primeUiSfx } from '$lib/ui-sfx';
   import { onMount } from 'svelte';
   import {
     albums,
@@ -57,16 +58,24 @@
   );
 
   function toggleSearch() {
-    searchOpen = !searchOpen;
+    const opening = !searchOpen;
+    searchOpen = opening;
+    playUiSfx(opening ? 'open' : 'back');
     if (!searchOpen) { searchQuery = ''; }
     else setTimeout(() => searchInput?.focus(), 30);
   }
 
   function onSearchKey(e: KeyboardEvent) {
-    if (e.key === 'Escape') { searchOpen = false; searchQuery = ''; }
+    if (e.key === 'Escape' && searchOpen) {
+      playUiSfx('back');
+      searchOpen = false;
+      searchQuery = '';
+    }
   }
 
   onMount(async () => {
+    primeUiSfx();
+
     // Restore volume to audio backend
     await initVolume();
 
@@ -83,11 +92,42 @@
   });
 
   function selectAlbum(album: Album) {
+    playUiSfx('confirm');
     selectedAlbum.set(album);
   }
 
+  async function handleTransportPlayPause() {
+    if ($isPlaying) await pause();
+    else await resume();
+  }
+
+  async function handlePrev() {
+    if (!$currentAlbum) return;
+    playUiSfx('nextPrev');
+    await playPrev($currentAlbum);
+  }
+
+  async function handleNext() {
+    if (!$currentAlbum) return;
+    playUiSfx('nextPrev');
+    await playNext($currentAlbum);
+  }
+
+  async function handleShuffleAll() {
+    playUiSfx('confirm');
+    await playShuffledAll($albums);
+  }
+
+  function openOptions() {
+    playUiSfx('open');
+    optionsOpen = true;
+  }
+
   function openCurrentAlbum() {
-    if ($currentAlbum) selectedAlbum.set($currentAlbum);
+    if ($currentAlbum) {
+      playUiSfx('confirm');
+      selectedAlbum.set($currentAlbum);
+    }
   }
 </script>
 
@@ -170,7 +210,7 @@
       <div class="transport">
         <button
           class="transport-btn transport-btn--shoulder"
-          onclick={() => $currentAlbum && playPrev($currentAlbum)}
+          onclick={handlePrev}
           disabled={!$currentTrack}
           title="Previous"
         >
@@ -180,7 +220,7 @@
         </button>
         <button
           class="transport-btn play-btn"
-          onclick={() => $isPlaying ? pause() : resume()}
+          onclick={handleTransportPlayPause}
           disabled={!$currentTrack}
           title={$isPlaying ? 'Pause' : 'Play'}
         >
@@ -189,7 +229,7 @@
         </button>
         <button
           class="transport-btn transport-btn--shoulder"
-          onclick={() => $currentAlbum && playNext($currentAlbum)}
+          onclick={handleNext}
           disabled={!$currentTrack}
           title="Next"
         >
@@ -233,11 +273,11 @@
         <PS2Btn type="circle" />
         <span class="btn-label" class:active-search={searchOpen}>Search</span>
       </button>
-      <button class="action-hint action-btn" onclick={() => playShuffledAll($albums)}>
+      <button class="action-hint action-btn" onclick={handleShuffleAll}>
         <PS2Btn type="square" />
         <span class="btn-label" class:active-shuffle={$isShuffled}>Shuffle</span>
       </button>
-      <button class="action-hint action-btn" onclick={() => optionsOpen = true}>
+      <button class="action-hint action-btn" onclick={openOptions}>
         <PS2Btn type="triangle" />
         <span class="btn-label">Options</span>
       </button>

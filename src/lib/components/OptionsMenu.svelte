@@ -2,30 +2,44 @@
   import { invoke } from '@tauri-apps/api/core';
   import { scanFolder, refreshLibrary, clearLibrary } from '../stores/library';
   import PS2Btn from './PS2Btn.svelte';
+  import { playUiSfx } from '$lib/ui-sfx';
 
   let { onclose, onStats }: { onclose: () => void; onStats: () => void } = $props();
 
   async function addFolder() {
     const path = await invoke<string | null>('pick_folder');
     if (path) {
+      playUiSfx('scan');
       await scanFolder(path);
     }
-    onclose();
+    handleClose(false);
   }
 
   async function refresh() {
-    onclose();
+    playUiSfx('scan');
+    handleClose(false);
     await refreshLibrary();
   }
 
   function clear() {
+    playUiSfx('confirm');
     clearLibrary();
-    onclose();
+    handleClose(false);
   }
 
   function openStats() {
+    playUiSfx('open');
     onclose();
     onStats();
+  }
+
+  function handleClose(playSound = true) {
+    if (playSound) playUiSfx('back');
+    onclose();
+  }
+
+  function handleOverlayMouseDown(e: MouseEvent) {
+    if (e.target === e.currentTarget) handleClose();
   }
 
   const items = [
@@ -39,7 +53,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="overlay"
-  onmousedown={(e) => e.target === e.currentTarget && onclose()}
+  onmousedown={handleOverlayMouseDown}
 >
   <nav class="menu">
     {#each items as item}
@@ -50,7 +64,7 @@
   </nav>
 
   <div class="close-hint">
-    <button class="hint-btn" onclick={onclose}>
+    <button class="hint-btn" onclick={() => handleClose()}>
       <PS2Btn type="circle" />
       <span>Close</span>
     </button>

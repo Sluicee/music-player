@@ -3,6 +3,7 @@
   import PS2Btn from './PS2Btn.svelte';
   import { loadStats, clearStats, type StatsMap } from '../stores/stats';
   import type { Album, Track } from '../types';
+  import { playUiSfx } from '$lib/ui-sfx';
 
   let { albums, onclose }: { albums: Album[]; onclose: () => void } = $props();
 
@@ -63,8 +64,24 @@
   let stats = $state(buildStats());
 
   function handleClear() {
+    playUiSfx('confirm');
     clearStats();
     stats = buildStats();
+  }
+
+  function setActiveTab(tab: Tab) {
+    if (activeTab === tab) return;
+    playUiSfx('steps');
+    activeTab = tab;
+  }
+
+  function handleClose() {
+    playUiSfx('back');
+    onclose();
+  }
+
+  function handleOverlayMouseDown(e: MouseEvent) {
+    if (e.target === e.currentTarget) handleClose();
   }
 
   // ── Format helpers ────────────────────────────────────────────────────────────
@@ -98,7 +115,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="overlay" onmousedown={(e) => e.target === e.currentTarget && onclose()}>
+<div class="overlay" onmousedown={handleOverlayMouseDown}>
   <div class="panel">
 
     <!-- Summary row -->
@@ -119,9 +136,9 @@
 
     <!-- Tabs -->
     <div class="tabs">
-      <button class="tab" class:active={activeTab === 'albums'} onclick={() => activeTab = 'albums'}>Albums</button>
-      <button class="tab" class:active={activeTab === 'tracks'} onclick={() => activeTab = 'tracks'}>Tracks</button>
-      <button class="tab" class:active={activeTab === 'recent'} onclick={() => activeTab = 'recent'}>Recent</button>
+      <button class="tab" class:active={activeTab === 'albums'} onclick={() => setActiveTab('albums')}>Albums</button>
+      <button class="tab" class:active={activeTab === 'tracks'} onclick={() => setActiveTab('tracks')}>Tracks</button>
+      <button class="tab" class:active={activeTab === 'recent'} onclick={() => setActiveTab('recent')}>Recent</button>
     </div>
 
     <!-- Content -->
@@ -198,7 +215,7 @@
 
     <!-- Footer hints -->
     <div class="footer">
-      <button class="hint-btn" onclick={onclose}>
+      <button class="hint-btn" onclick={handleClose}>
         <PS2Btn type="circle" />
         <span>Back</span>
       </button>

@@ -1,11 +1,14 @@
 <script lang="ts">
   import { volume, setVolume } from '../stores/player';
+  import { playUiSfx } from '$lib/ui-sfx';
 
   const STEPS = 10;
 
   let level = $derived(Math.round($volume * STEPS));
 
   function setLevel(n: number) {
+    if (n === level) return;
+    playUiSfx('steps');
     setVolume(n / STEPS);
   }
 
