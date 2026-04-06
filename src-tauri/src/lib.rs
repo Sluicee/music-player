@@ -7,6 +7,14 @@ use media_controls::MediaControlsManager;
 use scanner::{calculate_library_size, scan_folder, Album};
 use tauri_plugin_dialog::DialogExt;
 use tauri::{Manager, Emitter, State};
+use semver::Version;
+
+#[derive(serde::Serialize)]
+struct UpdateCheck {
+    version: String,
+    url: String,
+    is_available: bool,
+}
 
 // ── Dialog command ────────────────────────────────────────────────────────────
 
@@ -278,6 +286,45 @@ fn update_media_playback_state(
     media_controls.inner().update_playback(is_playing, position_ms);
 }
 
+// ── Update Commands ──────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn check_for_updates(app: tauri::AppHandle) -> Result<UpdateCheck, String> {
+    let current_version_str = app.config().version.as_ref().ok_or("No version in tauri.conf.json")?;
+    
+    let repo_owner = "Sluicee";
+    let repo_name = "memory-card";
+    let url = format!("https://api.github.com/repos/{}/{}/releases/latest", repo_owner, repo_name);
+
+    let client = reqwest::Client::builder()
+        .user_agent("MemoryCard-App")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let resp: serde_json::Value = client.get(&url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .json()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let latest_tag = resp["tag_name"].as_str().ok_or("No latest release found on GitHub")?;
+    let download_url = resp["html_url"].as_str().ok_or("No download URL found")?;
+
+    // Parse versions, stripping 'v' prefix if present
+    let current_v = Version::parse(current_version_str.trim_start_matches('v'))
+        .map_err(|e| format!("Failed to parse process version: {}", e))?;
+    let latest_v = Version::parse(latest_tag.trim_start_matches('v'))
+        .map_err(|e| format!("Failed to parse GitHub version: {}", e))?;
+
+    Ok(UpdateCheck {
+        version: latest_tag.to_string(),
+        url: download_url.to_string(),
+        is_available: latest_v > current_v,
+    })
+}
+
 // ── App entry ─────────────────────────────────────────────────────────────────
 
 #[cfg(windows)]
@@ -322,6 +369,7 @@ pub fn run() {
             load_library_cache,
             update_media_metadata,
             update_media_playback_state,
+            check_for_updates,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -31,6 +31,7 @@
     initVolume,
     loadLastTrack,
   } from '$lib/stores/player';
+  import { checkForUpdates } from '$lib/stores/updates';
   import { currentTrack as ct, currentAlbum as ca, duration } from '$lib/stores/player';
   import type { Album } from '$lib/types';
 
@@ -90,6 +91,9 @@
 
     // Load cached library (no rescan)
     await loadCache();
+
+    // Check for updates in background
+    checkForUpdates();
   });
 
   function selectAlbum(album: Album) {

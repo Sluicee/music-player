@@ -2604,6 +2604,7 @@ dependencies = [
  "rayon",
  "reqwest 0.12.28",
  "rodio",
+ "semver",
  "serde",
  "serde_json",
  "souvlaki",

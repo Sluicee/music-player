@@ -1,6 +1,8 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import { scanFolder, refreshLibrary, clearLibrary } from '../stores/library';
+  import { updateInfo } from '../stores/updates';
+  import { openUrl } from '@tauri-apps/plugin-opener';
   import PS2Btn from './PS2Btn.svelte';
   import { playUiSfx } from '$lib/ui-sfx';
 
@@ -42,12 +44,21 @@
     if (e.target === e.currentTarget) handleClose();
   }
 
-  const items = [
+  function getUpdate() {
+    if ($updateInfo) {
+      playUiSfx('confirm');
+      openUrl($updateInfo.url);
+      handleClose(false);
+    }
+  }
+
+  const items = $derived([
+    ...($updateInfo ? [{ label: `Get Update (${$updateInfo.version})`, action: getUpdate, highlight: true }] : []),
     { label: 'Add new folder',  action: addFolder  },
     { label: 'Refresh library', action: refresh    },
     { label: 'Statistics',      action: openStats  },
     { label: 'Clear library',   action: clear      },
-  ];
+  ]);
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -57,7 +68,7 @@
 >
   <nav class="menu">
     {#each items as item}
-      <button class="menu-item" onclick={item.action}>
+      <button class="menu-item" class:highlight={item.highlight} onclick={item.action}>
         {item.label}
       </button>
     {/each}
@@ -119,6 +130,17 @@
 
   .menu-item:hover {
     color: var(--track-active);
+  }
+
+  .menu-item.highlight {
+    color: var(--track-active);
+    animation: pulse 1.5s infinite ease-in-out;
+  }
+
+  @keyframes pulse {
+    0% { filter: brightness(1); }
+    50% { filter: brightness(1.5) drop-shadow(0 0 5px var(--track-active)); }
+    100% { filter: brightness(1); }
   }
 
   .close-hint {
