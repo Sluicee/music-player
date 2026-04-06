@@ -199,11 +199,17 @@ pub fn scan_folder(folder_path: &str, app: &tauri::AppHandle, covers_dir: &Path)
 
     for (result, audio_path) in results {
         let TrackResult { track, cover } = result;
-        let album_key = format!("{}::{}", track.album_artist, track.album);
+        // Normalize key: trim whitespace + lowercase to merge tracks whose tags
+        // differ only in case or surrounding whitespace (common tagging inconsistency).
+        let album_key = format!(
+            "{}::{}",
+            track.album_artist.trim().to_lowercase(),
+            track.album.trim().to_lowercase()
+        );
         let album = albums.entry(album_key.clone()).or_insert_with(|| Album {
             id: album_key,
-            title: track.album.clone(),
-            artist: track.album_artist.clone(),
+            title: track.album.trim().to_string(),
+            artist: track.album_artist.trim().to_string(),
             year: track.year,
             cover_art: None,
             tracks: Vec::new(),
