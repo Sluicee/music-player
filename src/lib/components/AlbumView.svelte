@@ -163,7 +163,7 @@
       </button>
       <button class="hint-btn" onclick={handlePlayPause}>
         <PS2Btn type="cross" />
-        <span>{isActiveAlbum && $isPlaying ? 'Pause' : 'Play'}</span>
+        <span class="play-pause-text">{isActiveAlbum && $isPlaying ? 'Pause' : 'Play'}</span>
       </button>
       <button class="hint-btn" onclick={handleShuffle}>
         <PS2Btn type="square" />
@@ -353,6 +353,12 @@
 
   .hint-btn:hover:not(:disabled) { color: var(--text-primary); }
   .hint-btn:disabled { opacity: 0.35; cursor: default; }
+
+  .play-pause-text {
+    display: inline-block;
+    min-width: 5ch;
+    text-align: left;
+  }
 
   .hint-btn--shoulder {
     gap: 6px;

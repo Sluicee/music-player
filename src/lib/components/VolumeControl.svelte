@@ -2,10 +2,8 @@
   import { volume, setVolume } from '../stores/player';
   import { playUiSfx } from '$lib/ui-sfx';
 
-  const STEP_SIZE = 5; 
-  const STEPS = 100 / STEP_SIZE; // Это 20
-  const VISUAL_BARS = 10; // Сколько палок видим
-  const STEPS_PER_BAR = STEPS / VISUAL_BARS; // Это 2
+  const STEPS = 20;       // 20 шагов по 5%
+  const VISUAL_BARS = 10; // 10 палок, каждая = 2 шага
 
   let level = $derived(Math.round($volume * STEPS));
 
@@ -41,13 +39,14 @@
 
   <div class="bars">
     {#each Array(VISUAL_BARS) as _, i}
+      {@const barFull = (i + 1) * 2}
+      {@const barHalf = i * 2 + 1}
       <button
         class="bar"
-        /* Полоска светится, если текущий уровень покрывает её хотя бы частично */
-        class:filled={level >= (i + 1) * STEPS_PER_BAR}
-        /* При клике ставим уровень, соответствующий этой полоске */
-        onclick={() => setLevel((i + 1) * STEPS_PER_BAR)}
-        style="height: {5 + i * 2.2}px" 
+        class:filled={level >= barFull}
+        class:half={level === barHalf}
+        onclick={() => setLevel(barFull)}
+        style="height: {5 + i * 2.2}px"
         aria-label="Volume bar {i + 1}"
       ></button>
     {/each}
@@ -63,7 +62,7 @@
     <span class="trigger-mark">+</span>
   </button>
 
-  <span class="vol-num">{level * STEP_SIZE}</span>
+  <span class="vol-num">{level * 5}</span>
 </div>
 
 <style>
@@ -123,6 +122,11 @@
     opacity: 1;
     background: linear-gradient(180deg, #7fd0ff, #3b79ff);
     box-shadow: 0 0 5px rgba(86, 143, 255, 0.28);
+  }
+
+  .bar.half {
+    opacity: 0.45;
+    background: linear-gradient(180deg, #7fd0ff, #3b79ff);
   }
 
   .vol-num {

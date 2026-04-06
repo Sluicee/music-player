@@ -23,6 +23,36 @@
   // Keep reactive to spin prop
   $effect(() => { isSpinning = spin; });
 
+  function loadTexture(texSrc: string) {
+    if (!mesh) return;
+    const mats = mesh.material as THREE.Material[];
+    const sideMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2e, roughness: 0.6 });
+    const loader = new THREE.ImageBitmapLoader();
+    loader.setOptions({ imageOrientation: 'flipY' });
+    loader.load(texSrc, (bitmap) => {
+      const tex = new THREE.Texture(bitmap);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.needsUpdate = true;
+      const frontMat = new THREE.MeshStandardMaterial({ map: tex });
+      const texBack = tex.clone();
+      texBack.repeat.set(-1, 1);
+      texBack.offset.set(1, 0);
+      texBack.needsUpdate = true;
+      const backMat = new THREE.MeshStandardMaterial({ map: texBack });
+      // dispose old face materials before replacing
+      if (mats[4] !== sideMat) (mats[4] as THREE.MeshStandardMaterial).map?.dispose(), mats[4].dispose();
+      if (mats[5] !== sideMat) (mats[5] as THREE.MeshStandardMaterial).map?.dispose(), mats[5].dispose();
+      mats[4] = frontMat;
+      mats[5] = backMat;
+      mesh.material = [...mats];
+    });
+  }
+
+  // React to src changes after mount
+  $effect(() => {
+    if (src && mesh) loadTexture(src);
+  });
+
   onMount(() => {
     const W = size, H = size;
     const DEPTH = Math.max(3, size * 0.022); // proportional thickness
@@ -47,25 +77,7 @@
     mesh = new THREE.Mesh(geo, materials);
     scene.add(mesh);
 
-    if (src) {
-      // ImageBitmapLoader decodes off the main thread — no freeze for large images
-      const loader = new THREE.ImageBitmapLoader();
-      loader.setOptions({ imageOrientation: 'flipY' });
-      loader.load(src, (bitmap) => {
-        const tex = new THREE.Texture(bitmap);
-        tex.colorSpace = THREE.SRGBColorSpace;
-        tex.needsUpdate = true;
-        const frontMat = new THREE.MeshStandardMaterial({ map: tex });
-        const texBack = tex.clone();
-        texBack.repeat.set(-1, 1);
-        texBack.offset.set(1, 0);
-        texBack.needsUpdate = true;
-        const backMat = new THREE.MeshStandardMaterial({ map: texBack });
-        materials[4] = frontMat;
-        materials[5] = backMat;
-        mesh.material = [...materials];
-      });
-    }
+    if (src) loadTexture(src);
 
     const ambient = new THREE.AmbientLight(0xffffff, 0.55);
     scene.add(ambient);

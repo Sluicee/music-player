@@ -34,12 +34,13 @@
   import { currentTrack as ct, currentAlbum as ca, duration } from '$lib/stores/player';
   import type { Album } from '$lib/types';
 
-  let hoveredAlbum = $state<Album | null>(null);
-  let optionsOpen  = $state(false);
-  let statsOpen    = $state(false);
-  let searchOpen   = $state(false);
-  let searchQuery  = $state('');
-  let searchInput  = $state<HTMLInputElement | null>(null);
+  let hoveredAlbum      = $state<Album | null>(null);
+  let optionsOpen       = $state(false);
+  let statsOpen         = $state(false);
+  let searchOpen        = $state(false);
+  let searchQuery       = $state('');
+  let searchInput       = $state<HTMLInputElement | null>(null);
+  let followPlayback    = $state(false);
 
   const filteredAlbums = $derived(
     searchOpen && searchQuery.trim()
@@ -93,6 +94,7 @@
 
   function selectAlbum(album: Album) {
     playUiSfx('confirm');
+    followPlayback = false;
     selectedAlbum.set(album);
   }
 
@@ -126,9 +128,16 @@
   function openCurrentAlbum() {
     if ($currentAlbum) {
       playUiSfx('confirm');
+      followPlayback = true;
       selectedAlbum.set($currentAlbum);
     }
   }
+
+  $effect(() => {
+    if (followPlayback && $selectedAlbum && $currentAlbum && $selectedAlbum !== $currentAlbum) {
+      selectedAlbum.set($currentAlbum);
+    }
+  });
 </script>
 
 <div class="root">
@@ -225,7 +234,7 @@
           title={$isPlaying ? 'Pause' : 'Play'}
         >
           <PS2Btn type="start" />
-          <span class="transport-text">{$isPlaying ? 'Pause' : 'Play'}</span>
+          <span class="transport-text play-pause-text">{$isPlaying ? 'Pause' : 'Play'}</span>
         </button>
         <button
           class="transport-btn transport-btn--shoulder"
@@ -288,7 +297,7 @@
 </div>
 
 {#if $selectedAlbum}
-  <AlbumView album={$selectedAlbum} onclose={() => selectedAlbum.set(null)} />
+  <AlbumView album={$selectedAlbum} onclose={() => { selectedAlbum.set(null); followPlayback = false; }} />
 {/if}
 
 {#if optionsOpen}
@@ -601,6 +610,12 @@
   .transport-icon,
   .transport-text {
     text-shadow: none;
+  }
+
+  .play-pause-text {
+    display: inline-block;
+    min-width: 6ch;
+    text-align: center;
   }
 
   .transport-tag {
