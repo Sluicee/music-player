@@ -130,32 +130,33 @@
 
   <!-- Bottom: gamepad hints (functional) + volume -->
   <div class="hints">
-    <button class="hint-btn" onclick={onclose}>
-      <PS2Btn type="circle" />
-      <span>Back</span>
-    </button>
-    <button class="hint-btn" onclick={handlePlayPause}>
-      <PS2Btn type="cross" />
-      <span>{isActiveAlbum && $isPlaying ? 'Pause' : 'Play'}</span>
-    </button>
-    <button class="hint-btn" onclick={() => playShuffled(album)}>
-      <PS2Btn type="square" />
-      <span>Shuffle</span>
-    </button>
+    <div class="hints-row">
+      <button class="hint-btn" onclick={onclose}>
+        <PS2Btn type="circle" />
+        <span>Back</span>
+      </button>
+      <button class="hint-btn" onclick={handlePlayPause}>
+        <PS2Btn type="cross" />
+        <span>{isActiveAlbum && $isPlaying ? 'Pause' : 'Play'}</span>
+      </button>
+      <button class="hint-btn" onclick={() => playShuffled(album)}>
+        <PS2Btn type="square" />
+        <span>Shuffle</span>
+      </button>
 
-    <div class="hints-sep"></div>
+      <div class="hints-sep"></div>
 
-    <button class="hint-btn" onclick={() => playPrev(album)} disabled={!$currentTrack}>
-      <span class="nav-icon">⏮</span>
-      <span>Prev</span>
-    </button>
-    <button class="hint-btn" onclick={() => playNext(album)} disabled={!$currentTrack}>
-      <span class="nav-icon">⏭</span>
-      <span>Next</span>
-    </button>
-
-    <div class="hints-sep"></div>
-    <VolumeControl />
+      <button class="hint-btn hint-btn--shoulder" onclick={() => playPrev(album)} disabled={!$currentTrack}>
+        <span class="shoulder-tag">L1</span>
+        <span class="nav-icon">&lt;&lt;</span>
+        <span>Prev</span>
+      </button>
+      <button class="hint-btn hint-btn--shoulder" onclick={() => playNext(album)} disabled={!$currentTrack}>
+        <span class="shoulder-tag">R1</span>
+        <span class="nav-icon">&gt;&gt;</span>
+        <span>Next</span>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -283,8 +284,21 @@
   /* ── Bottom hints ── */
   .hints {
     display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .hints-row {
+    display: flex;
     align-items: center;
     gap: 18px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .hints-row--volume {
+    gap: 0;
   }
 
   .hints-sep {
@@ -310,6 +324,34 @@
   .hint-btn:hover:not(:disabled) { color: var(--text-primary); }
   .hint-btn:disabled { opacity: 0.35; cursor: default; }
 
-  .nav-icon { font-size: 13px; }
+  .hint-btn--shoulder {
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgb(48, 48, 48), rgb(54, 58, 68));
+    border: 1px solid rgba(212, 219, 240, 0.1);
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.18),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 -1px 2px rgba(0, 0, 0, 0.25);
+  }
+
+  .shoulder-tag,
+  .nav-icon {
+    text-shadow: none;
+  }
+
+  .shoulder-tag {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: rgba(238, 242, 255, 0.82);
+  }
+
+  .nav-icon {
+    font-size: 11px;
+    font-weight: 900;
+    color: var(--track-hover);
+  }
 
 </style>
+

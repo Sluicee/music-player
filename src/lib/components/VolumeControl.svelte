@@ -9,16 +9,30 @@
     setVolume(n / STEPS);
   }
 
+  function stepLevel(delta: number) {
+    const next = Math.max(0, Math.min(STEPS, level + delta));
+    setLevel(next);
+  }
+
   function onWheel(e: WheelEvent) {
     e.preventDefault();
-    const next = Math.max(0, Math.min(STEPS, level + (e.deltaY < 0 ? 1 : -1)));
-    setLevel(next);
+    stepLevel(e.deltaY < 0 ? 1 : -1);
   }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="vol" onwheel={onWheel}>
   <span class="vol-label">VOL</span>
+  <button
+    class="trigger-btn"
+    onclick={() => stepLevel(-1)}
+    disabled={level === 0}
+    aria-label="Decrease volume"
+  >
+    <span class="trigger-tag">L2</span>
+    <span class="trigger-mark">-</span>
+  </button>
+
   <div class="bars">
     {#each Array(STEPS) as _, i}
       <button
@@ -30,13 +44,23 @@
       ></button>
     {/each}
   </div>
+
+  <button
+    class="trigger-btn"
+    onclick={() => stepLevel(1)}
+    disabled={level === STEPS}
+    aria-label="Increase volume"
+  >
+    <span class="trigger-tag">R2</span>
+    <span class="trigger-mark">+</span>
+  </button>
   <span class="vol-num">{level * 10}</span>
 </div>
 
 <style>
   .vol {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     gap: 8px;
   }
 
@@ -47,6 +71,50 @@
     text-shadow: var(--text-shadow);
     letter-spacing: 0.08em;
     padding-bottom: 1px;
+  }
+
+  .trigger-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 30px;
+    padding: 2px 7px;
+    border: 1px solid rgba(212, 219, 240, 0.12);
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgb(48, 48, 48), rgb(54, 58, 68));
+    color: var(--text-secondary);
+    cursor: pointer;
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      inset 0 -1px 2px rgba(0, 0, 0, 0.28);
+    transition: color 0.12s, opacity 0.12s, transform 0.12s, filter 0.12s;
+  }
+
+  .trigger-btn:hover:not(:disabled) {
+    color: var(--text-primary);
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+  }
+
+  .trigger-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .trigger-tag,
+  .trigger-mark {
+    text-shadow: none;
+  }
+
+  .trigger-tag {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+  }
+
+  .trigger-mark {
+    font-size: 11px;
+    font-weight: 900;
   }
 
   .bars {
@@ -63,11 +131,13 @@
     padding: 0;
     opacity: 0.3;
     transition: opacity 0.1s;
+    border-radius: 999px 999px 2px 2px;
   }
 
   .bar.filled {
     opacity: 1;
-    background: var(--text-secondary);
+    background: linear-gradient(180deg, #7fd0ff, #3b79ff);
+    box-shadow: 0 0 5px rgba(86, 143, 255, 0.28);
   }
 
   .bar:hover {
@@ -80,6 +150,7 @@
     color: var(--text-dim);
     text-shadow: var(--text-shadow);
     padding-bottom: 1px;
-    min-width: 20px;
+    min-width: 18px;
+    text-align: left;
   }
 </style>

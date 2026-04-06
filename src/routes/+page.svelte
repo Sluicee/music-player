@@ -160,33 +160,48 @@
 
   <!-- Footer -->
   <footer class="footer">
-    <!-- Row 1: transport + progress, centered -->
+    <!-- Row 1: progress -->
+    <div class="footer-progress">
+      <ProgressBar />
+    </div>
+
+    <!-- Row 2: transport + volume -->
     <div class="footer-top">
       <div class="transport">
         <button
-          class="transport-btn"
+          class="transport-btn transport-btn--shoulder"
           onclick={() => $currentAlbum && playPrev($currentAlbum)}
           disabled={!$currentTrack}
           title="Previous"
-        >⏮</button>
+        >
+          <span class="transport-tag">L1</span>
+          <span class="transport-icon">&lt;&lt;</span>
+          <span class="transport-text">Prev</span>
+        </button>
         <button
           class="transport-btn play-btn"
           onclick={() => $isPlaying ? pause() : resume()}
           disabled={!$currentTrack}
           title={$isPlaying ? 'Pause' : 'Play'}
-        >{$isPlaying ? '⏸' : '▶'}</button>
+        >
+          <PS2Btn type="start" />
+          <span class="transport-text">{$isPlaying ? 'Pause' : 'Play'}</span>
+        </button>
         <button
-          class="transport-btn"
+          class="transport-btn transport-btn--shoulder"
           onclick={() => $currentAlbum && playNext($currentAlbum)}
           disabled={!$currentTrack}
           title="Next"
-        >⏭</button>
+        >
+          <span class="transport-tag">R1</span>
+          <span class="transport-icon">&gt;&gt;</span>
+          <span class="transport-text">Next</span>
+        </button>
       </div>
-      <ProgressBar />
       <VolumeControl />
     </div>
 
-    <!-- Row 2: now-playing | volume | hints -->
+    <!-- Row 3: now-playing | volume | hints -->
     <div class="footer-bottom">
       <!-- Now playing -->
       <button
@@ -209,7 +224,7 @@
       </button>
 
     <!-- PS2 action hints -->
-    <div class="actions">
+      <div class="actions">
       <div class="action-hint">
         <PS2Btn type="cross" />
         <span class="btn-label">Select</span>
@@ -422,6 +437,12 @@
     padding-top: 8px;
   }
 
+  .footer-progress {
+    display: flex;
+    justify-content: center;
+    padding: 0 0 2px;
+  }
+
   .footer-top {
     display: flex;
     align-items: center;
@@ -503,29 +524,66 @@
   .transport {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
   }
 
   .transport-btn {
-    background: none;
-    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 25px;
+    padding: 3px 8px;
+    background: linear-gradient(180deg, rgb(48, 48, 48), rgb(54, 58, 68));
+    border: 1px solid rgba(212, 219, 240, 0.12);
+    border-radius: 999px;
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      inset 0 -1px 2px rgba(0, 0, 0, 0.28);
     cursor: pointer;
-    font-size: 14px;
     color: var(--text-secondary);
-    padding: 4px 6px;
-    border-radius: 6px;
-    transition: color 0.15s, background 0.15s;
-    line-height: 1;
+    transition: color 0.12s, opacity 0.12s, transform 0.12s, filter 0.12s;
   }
 
   .transport-btn:hover:not(:disabled) {
-    color: var(--track-hover);
-    background: none;
+    color: var(--text-primary);
+    transform: translateY(-1px);
+    filter: brightness(1.06);
   }
 
-  .transport-btn:disabled { opacity: 0.35; cursor: default; }
+  .transport-btn:disabled { opacity: 0.38; cursor: default; }
 
-  .play-btn { font-size: 16px; }
+  .transport-btn--shoulder {
+    justify-content: center;
+  }
+
+  .transport-tag,
+  .transport-icon,
+  .transport-text {
+    text-shadow: none;
+  }
+
+  .transport-tag {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: rgba(238, 242, 255, 0.82);
+  }
+
+  .transport-icon {
+    font-size: 10px;
+    font-weight: 900;
+    color: var(--track-hover);
+  }
+
+  .transport-text {
+    font-size: 11px;
+    letter-spacing: 0.05em;
+  }
+
+  .play-btn {
+    justify-content: center;
+    padding-inline: 7px 9px;
+  }
 
   /* PS2 buttons */
   .actions {
