@@ -34,6 +34,35 @@
 
   let hoveredAlbum = $state<Album | null>(null);
   let optionsOpen  = $state(false);
+  let searchOpen   = $state(false);
+  let searchQuery  = $state('');
+  let searchInput  = $state<HTMLInputElement | null>(null);
+
+  const filteredAlbums = $derived(
+    searchOpen && searchQuery.trim()
+      ? (() => {
+          const q = searchQuery.trim().toLowerCase();
+          return $albums.filter(a =>
+            a.title.toLowerCase().includes(q) ||
+            a.artist.toLowerCase().includes(q) ||
+            a.tracks.some(t =>
+              t.title.toLowerCase().includes(q) ||
+              t.artist.toLowerCase().includes(q)
+            )
+          );
+        })()
+      : $albums
+  );
+
+  function toggleSearch() {
+    searchOpen = !searchOpen;
+    if (!searchOpen) { searchQuery = ''; }
+    else setTimeout(() => searchInput?.focus(), 30);
+  }
+
+  function onSearchKey(e: KeyboardEvent) {
+    if (e.key === 'Escape') { searchOpen = false; searchQuery = ''; }
+  }
 
   onMount(async () => {
     // Restore volume to audio backend
@@ -76,11 +105,21 @@
     </div>
 
     <div class="header-right">
-      {#if $isScanning}
+      {#if searchOpen}
+        <input
+          bind:this={searchInput}
+          bind:value={searchQuery}
+          onkeydown={onSearchKey}
+          class="search-input"
+          placeholder="Search…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      {:else if $isScanning}
         <span class="scanning">Scanning…</span>
       {/if}
       {#if hoveredAlbum}
-        <span class="hovered-title">{hoveredAlbum.title}</span>
+        <span class="hovered-title" class:hovered-title--small={searchOpen}>{hoveredAlbum.title}</span>
       {/if}
     </div>
   </header>
@@ -109,7 +148,11 @@
           <span>{$scanStatus.filesScanned} files · {$scanStatus.albumsFound} albums found</span>
         </div>
       {/if}
-      <AlbumGrid albums={$albums} onselect={selectAlbum} onhover={(a) => (hoveredAlbum = a)} />
+      {#if searchOpen && searchQuery && filteredAlbums.length === 0}
+        <div class="state-msg"><p class="hint">No results for <strong>{searchQuery}</strong></p></div>
+      {:else}
+        <AlbumGrid albums={filteredAlbums} onselect={selectAlbum} onhover={(a) => (hoveredAlbum = a)} />
+      {/if}
     {/if}
   </main>
 
@@ -169,10 +212,10 @@
         <PS2Btn type="cross" />
         <span class="btn-label">Select</span>
       </div>
-      <div class="action-hint">
+      <button class="action-hint action-btn" onclick={toggleSearch}>
         <PS2Btn type="circle" />
-        <span class="btn-label">Back</span>
-      </div>
+        <span class="btn-label" class:active-search={searchOpen}>Search</span>
+      </button>
       <button class="action-hint action-btn" onclick={() => playShuffledAll($albums)}>
         <PS2Btn type="square" />
         <span class="btn-label" class:active-shuffle={$isShuffled}>Shuffle</span>
@@ -272,8 +315,10 @@
 
   .header-right {
     display: flex;
-    align-items: flex-start;
-    gap: 12px;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 4px;
     min-width: 0;
     max-width: 50%;
   }
@@ -496,4 +541,39 @@
   }
 
   .active-shuffle { color: var(--track-active); }
+  .active-search  { color: var(--track-active); }
+
+  /* ── Search ── */
+  .search-input {
+    width: 100%;
+    background: rgba(10, 10, 22, 0.55);
+    border: 1px solid rgba(90, 95, 120, 0.35);
+    border-radius: 4px;
+    color: var(--track-active);
+    font-family: inherit;
+    font-size: 22px;
+    letter-spacing: 0.01em;
+    padding: 3px 8px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    text-align: right;
+  }
+
+  .search-input:focus {
+    border-color: rgba(90, 95, 180, 0.65);
+    box-shadow: 0 0 10px rgba(80, 100, 200, 0.15);
+  }
+
+  .search-input::placeholder {
+    color: var(--text-dim);
+    font-size: 16px;
+  }
+
+  /* Compact single-line title shown below the search input */
+  .hovered-title--small {
+    font-size: 16px;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    line-height: 1.2;
+  }
 </style>
