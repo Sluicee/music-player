@@ -10,6 +10,7 @@
     playPrev,
     pause,
     resume,
+    isShuffled,
   } from '../stores/player';
   import VolumeControl from './VolumeControl.svelte';
   import SpinningCover from './SpinningCover.svelte';
@@ -167,7 +168,7 @@
       </button>
       <button class="hint-btn" onclick={handleShuffle}>
         <PS2Btn type="square" />
-        <span>Shuffle</span>
+        <span class:active-shuffle={$isShuffled}>Shuffle</span>
       </button>
 
       <div class="hints-sep"></div>
@@ -359,6 +360,8 @@
     min-width: 5ch;
     text-align: left;
   }
+
+  .active-shuffle { color: var(--track-active); }
 
   .hint-btn--shoulder {
     gap: 6px;

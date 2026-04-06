@@ -75,7 +75,9 @@ function startPolling() {
         const next = _qIdx + 1;
         if (next < _queue.length) {
           _qIdx = next;
-          await playTrack(_queue[_qIdx].track, _queue[_qIdx].album);
+          await playTrack(_queue[_qIdx].track, _queue[_qIdx].album, true);
+        } else {
+          stopShuffle();
         }
       } else {
         const album = get(currentAlbum);
@@ -91,8 +93,18 @@ function stopPolling() {
 
 // ── Commands (unchanged from working version) ─────────────────────────────────
 
-export async function playTrack(track: Track, album: Album) {
+export function stopShuffle() {
+  _queue = [];
+  _qIdx = -1;
+  isShuffled.set(false);
+}
+
+export async function playTrack(track: Track, album: Album, fromShuffle = false) {
   try {
+    if (!fromShuffle) {
+      stopShuffle();
+    }
+
     // Record listened time for the outgoing track before switching
     const prevTrack = get(currentTrack);
     if (prevTrack) recordListened(prevTrack.id, get(position));
@@ -171,7 +183,14 @@ export async function seekTo(nextPosition: number) {
 export async function playNext(album: Album) {
   if (_queue.length > 0) {
     const next = _qIdx + 1;
-    if (next < _queue.length) { _qIdx = next; await playTrack(_queue[_qIdx].track, _queue[_qIdx].album); }
+    if (next < _queue.length) { 
+      _qIdx = next; 
+      await playTrack(_queue[_qIdx].track, _queue[_qIdx].album, true); 
+    } else {
+      stopShuffle();
+      // If we finished shuffle queue, maybe play next in album? 
+      // For now, just stop or let it finish.
+    }
     return;
   }
   const track = get(currentTrack);
@@ -191,7 +210,10 @@ export async function playPrev(album: Album) {
   }
   if (_queue.length > 0) {
     const prev = _qIdx - 1;
-    if (prev >= 0) { _qIdx = prev; await playTrack(_queue[_qIdx].track, _queue[_qIdx].album); }
+    if (prev >= 0) { 
+      _qIdx = prev; 
+      await playTrack(_queue[_qIdx].track, _queue[_qIdx].album, true); 
+    }
     return;
   }
   const idx = album.tracks.findIndex((t) => t.id === track.id);
@@ -202,18 +224,32 @@ export async function playPrev(album: Album) {
 // ── Shuffle ───────────────────────────────────────────────────────────────────
 
 export async function playShuffledAll(albums: Album[]) {
+  if (get(isShuffled) && _queue.length > albumCount(albums)) {
+    // Basic toggle: if already shuffled across all, stop
+    stopShuffle();
+    return;
+  }
   const all: QueueItem[] = albums.flatMap(a => a.tracks.map(t => ({ track: t, album: a })));
   _queue = fisherYates(all);
   _qIdx = 0;
   isShuffled.set(true);
-  if (_queue[0]) await playTrack(_queue[0].track, _queue[0].album);
+  if (_queue[0]) await playTrack(_queue[0].track, _queue[0].album, true);
+}
+
+function albumCount(albums: Album[]): number {
+  return albums.length;
 }
 
 export async function playShuffled(album: Album) {
+  if (get(isShuffled) && _queue.length === album.tracks.length) {
+    // Basic toggle: if already shuffled this specific album, stop
+    stopShuffle();
+    return;
+  }
   _queue = fisherYates(album.tracks.map(t => ({ track: t, album })));
   _qIdx = 0;
   isShuffled.set(true);
-  if (_queue[0]) await playTrack(_queue[0].track, _queue[0].album);
+  if (_queue[0]) await playTrack(_queue[0].track, _queue[0].album, true);
 }
 
 export async function initVolume() {
