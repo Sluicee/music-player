@@ -2,6 +2,7 @@ import { writable, derived, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { Album } from '../types';
+import { stop } from './player';
 
 const FOLDERS_KEY = 'mp_folders';
 const SIZE_KEY    = 'mp_lib_size';
@@ -122,6 +123,7 @@ export async function refreshLibrary() {
 }
 
 export function clearLibrary() {
+  stop();
   albums.set([]);
   librarySize.set('');
   localStorage.removeItem(SIZE_KEY);
