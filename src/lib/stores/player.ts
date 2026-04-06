@@ -1,5 +1,8 @@
 import { writable, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import { appDataDir, join } from '@tauri-apps/api/path';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import type { Track, Album } from '../types';
 import { recordPlay, recordListened } from './stats';
 
@@ -216,4 +219,88 @@ export async function playShuffled(album: Album) {
 export async function initVolume() {
   const v = get(volume);
   await invoke('audio_set_volume', { volume: v });
+}
+
+// ── OS Media Controls Sync ───────────────────────────────────────────────────
+
+// getCoverUrl removed because album.cover_art already contains the absolute path.
+
+currentTrack.subscribe(async track => {
+  if (track) {
+    const album = get(currentAlbum);
+    const coverUrl = album?.cover_art; // Use the path already stored in the album object
+    
+    // We update metadata first, but we DON'T await it forever if it's failing
+    invoke('update_media_metadata', { 
+      title: track.title, 
+      artist: track.artist, 
+      album: album?.title || 'Unknown',
+      coverUrl: coverUrl, // Tauri 2 maps camelCase JS to snake_case Rust
+      durationMs: Math.floor(track.duration * 1000)
+    }).catch(err => {
+      console.error('SMTC Metadata update failed:', err);
+    }).finally(() => {
+      // Vital: Wait a tiny bit (100ms) to ensure Windows SMTC has "settled" 
+      // the new metadata before we push the "Playing" state update.
+      setTimeout(syncPlayback, 100);
+    });
+  }
+});
+
+function syncPlayback() {
+  const playing = get(isPlaying);
+  const pos = Math.floor(get(position) * 1000); // ms
+  invoke('update_media_playback_state', { 
+    isPlaying: playing,
+    positionMs: pos
+  }).catch(console.error);
+}
+
+// Sync on major state changes
+isPlaying.subscribe(syncPlayback);
+isPaused.subscribe(syncPlayback);
+
+// We should also sync when a new track starts playing to ensure "Playing" state is fresh
+currentTrack.subscribe(() => {
+    setTimeout(syncPlayback, 100);
+});
+
+// Periodic heartbeat sync for Windows 11 (otherwise OS widget may freeze or show 'Play' icon)
+let heartbeatTimer: number | null = null;
+isPlaying.subscribe(playing => {
+  if (playing) {
+    if (!heartbeatTimer) {
+      heartbeatTimer = window.setInterval(syncPlayback, 5000);
+    }
+  } else {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  }
+});
+
+// ── Listen for OS Events ─────────────────────────────────────────────────────
+
+listen<string>('smtc-event', (event) => handleSystemAction(event.payload));
+listen<string>('thumbnail-event', (event) => handleSystemAction(event.payload));
+
+async function handleSystemAction(action: string) {
+  console.log('SMTC action received:', action, 'Current state isPlaying:', get(isPlaying));
+  const album = get(currentAlbum);
+  
+  if (action === 'play') {
+    await resume();
+  } else if (action === 'pause') {
+    await pause();
+  } else if (action === 'toggle') {
+    if (get(isPlaying)) await pause(); else await resume();
+  } else if (action === 'next') {
+    if (album) await playNext(album);
+  } else if (action === 'previous') {
+    if (album) await playPrev(album);
+  }
+
+  // Sync back immediately to keep OS widget state consistent
+  setTimeout(syncPlayback, 50);
 }

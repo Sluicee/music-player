@@ -33,4 +33,15 @@ base64 = "0.22"
 rodio = { version = "0.20", features = ["symphonia-all"] }
 symphonia = { version = "0.5", features = ["all"] }
 tokio = { version = "1", features = ["sync", "rt"] }
+souvlaki = "0.8"
+tauri-plugin-shell = "2.3.5"
 
+[target.'cfg(windows)'.dependencies.windows]
+version = "0.58.0"
+features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Gdi",
+]

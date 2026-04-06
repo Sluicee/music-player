@@ -1,10 +1,12 @@
 mod audio;
 mod scanner;
+mod media_controls;
 
 use audio::{create_player, PlaybackState, SharedPlayer};
-use scanner::{calculate_library_size, cover_filename, save_cover_bytes, scan_folder, Album};
+use media_controls::MediaControlsManager;
+use scanner::{calculate_library_size, scan_folder, Album};
 use tauri_plugin_dialog::DialogExt;
-use tauri::{Manager, Emitter};
+use tauri::{Manager, Emitter, State};
 
 // ── Dialog command ────────────────────────────────────────────────────────────
 
@@ -14,6 +16,25 @@ fn pick_folder(app: tauri::AppHandle) -> Option<String> {
         .file()
         .blocking_pick_folder()
         .map(|p| p.to_string())
+}
+
+// ── Native Helpers ────────────────────────────────────────────────────────────
+
+fn sanitize_filename(name: &str) -> String {
+    name.chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect()
+}
+
+fn cover_filename(id: &str, _mime_type: &str) -> String {
+    format!("{}.jpg", sanitize_filename(id))
+}
+
+fn save_cover_bytes(bytes: &[u8], id: &str, dir: &std::path::Path) -> Option<String> {
+    let filename = cover_filename(id, "image/jpeg");
+    let path = dir.join(&filename);
+    std::fs::write(&path, bytes).ok()?;
+    Some(path.to_string_lossy().into_owned())
 }
 
 // ── Scanner commands ──────────────────────────────────────────────────────────
@@ -234,16 +255,56 @@ fn audio_get_position(player: tauri::State<SharedPlayer>) -> f64 {
     player.get_position()
 }
 
+// ── OS Media Controls Commands ────────────────────────────────────────────────
+
+#[tauri::command]
+fn update_media_metadata(
+    title: String,
+    artist: String,
+    album: String,
+    cover_url: Option<String>,
+    duration_ms: u64,
+    media_controls: State<'_, MediaControlsManager>,
+) {
+    media_controls.inner().update_metadata(&title, &artist, &album, cover_url.as_deref(), duration_ms);
+}
+
+#[tauri::command]
+fn update_media_playback_state(
+    is_playing: bool,
+    position_ms: u64,
+    media_controls: State<'_, MediaControlsManager>,
+) {
+    media_controls.inner().update_playback(is_playing, position_ms);
+}
+
 // ── App entry ─────────────────────────────────────────────────────────────────
+
+#[cfg(windows)]
+fn set_app_id() {
+    use windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
+    use windows::core::w;
+    unsafe {
+        let _ = SetCurrentProcessExplicitAppUserModelID(w!("com.sluic.musicplayer"));
+    }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(windows)]
+    set_app_id();
+
     let player = create_player();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(player)
+        .setup(|app| {
+            let manager = MediaControlsManager::new(app.handle());
+            app.manage(manager);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             pick_folder,
             scan_music_folder,
@@ -259,6 +320,8 @@ pub fn run() {
             audio_get_position,
             save_library_cache,
             load_library_cache,
+            update_media_metadata,
+            update_media_playback_state,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
