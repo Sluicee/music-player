@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { convertFileSrc } from '@tauri-apps/api/core';
   import type { Album, Track } from '../types';
   import {
     currentTrack,
@@ -24,9 +25,11 @@
 
   let tintColor = $state('rgba(120, 120, 140, 0.28)');
 
+  const coverSrc = $derived(album.cover_art ? convertFileSrc(album.cover_art) : null);
+
   $effect(() => {
-    if (album.cover_art) {
-      extractDominantColor(album.cover_art).then((c) => (tintColor = c));
+    if (coverSrc) {
+      extractDominantColor(coverSrc).then((c) => (tintColor = c));
     } else {
       tintColor = 'rgba(120, 120, 140, 0.28)';
     }
@@ -85,8 +88,8 @@
   <div class="view">
 
     <!-- Always-spinning cover -->
-    {#if album.cover_art}
-      <SpinningCover src={album.cover_art} alt={album.title} />
+    {#if coverSrc}
+      <SpinningCover src={coverSrc} alt={album.title} />
     {:else}
       <div class="cover-placeholder">♪</div>
     {/if}

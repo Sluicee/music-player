@@ -1,4 +1,3 @@
-use base64::{engine::general_purpose::STANDARD, Engine};
 use lofty::prelude::*;
 use lofty::probe::Probe;
 use lofty::tag::ItemKey;
@@ -41,12 +40,23 @@ pub struct ScanProgress {
 
 const AUDIO_EXTENSIONS: &[&str] = &["mp3", "flac", "ogg", "m4a", "aac", "wav", "opus"];
 
+/// FNV-1a hash — deterministic filename-safe identifier for album cover files.
+fn cover_filename(album_id: &str, mime: &str) -> String {
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for byte in album_id.bytes() {
+        hash ^= byte as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    let ext = if mime.contains("png") { "png" } else { "jpg" };
+    format!("{:016x}.{}", hash, ext)
+}
+
 /// Scans folder, emitting events as albums are built up.
 /// Events:
 ///   "scan:progress" -> ScanProgress
 ///   "scan:album"    -> Album  (emitted when album is complete)
 ///   "scan:done"     -> u32 (total album count)
-pub fn scan_folder_streaming(folder_path: &str, app: &tauri::AppHandle) {
+pub fn scan_folder_streaming(folder_path: &str, app: &tauri::AppHandle, covers_dir: &Path) {
     let mut albums: HashMap<String, Album> = HashMap::new();
     let mut files_scanned: u32 = 0;
 
@@ -85,7 +95,7 @@ pub fn scan_folder_streaming(folder_path: &str, app: &tauri::AppHandle) {
             });
 
             if album.cover_art.is_none() {
-                album.cover_art = read_cover_art(path);
+                album.cover_art = save_cover_art(path, &album.id, covers_dir);
             }
 
             album.total_duration += track.duration;
@@ -175,14 +185,14 @@ fn read_track(path: &Path) -> Result<Track, Box<dyn std::error::Error>> {
     })
 }
 
-fn read_cover_art(path: &Path) -> Option<String> {
-    let tagged_file = Probe::open(path).ok()?.read().ok()?;
+/// Saves cover art as a binary image file and returns its path.
+fn save_cover_art(audio_path: &Path, album_id: &str, covers_dir: &Path) -> Option<String> {
+    let tagged_file = Probe::open(audio_path).ok()?.read().ok()?;
     let tag = tagged_file.primary_tag()?;
     let picture = tag.pictures().first()?;
-    let mime = picture
-        .mime_type()
-        .map(|m| m.to_string())
-        .unwrap_or_else(|| "image/jpeg".to_string());
-    let data = STANDARD.encode(picture.data());
-    Some(format!("data:{};base64,{}", mime, data))
+    let mime = picture.mime_type().map(|m| m.to_string()).unwrap_or_else(|| "image/jpeg".to_string());
+    let filename = cover_filename(album_id, &mime);
+    let dest = covers_dir.join(&filename);
+    std::fs::write(&dest, picture.data()).ok()?;
+    Some(dest.to_string_lossy().into_owned())
 }

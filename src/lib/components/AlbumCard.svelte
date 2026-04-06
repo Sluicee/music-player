@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { convertFileSrc } from '@tauri-apps/api/core';
   import type { Album } from '../types';
 
   let {
@@ -10,6 +11,8 @@
     onclick: () => void;
     onhover: (album: Album | null) => void;
   } = $props();
+
+  const coverSrc = $derived(album.cover_art ? convertFileSrc(album.cover_art) : null);
 </script>
 
 <button
@@ -20,8 +23,8 @@
 >
   <div class="art-wrap">
     <div class="art">
-      {#if album.cover_art}
-        <img src={album.cover_art} alt={album.title} draggable="false" />
+      {#if coverSrc}
+        <img src={coverSrc} alt={album.title} draggable="false" />
       {:else}
         <div class="art-placeholder">♪</div>
       {/if}

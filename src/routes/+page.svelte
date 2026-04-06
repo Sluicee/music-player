@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { convertFileSrc } from '@tauri-apps/api/core';
   import AlbumGrid from '$lib/components/AlbumGrid.svelte';
   import AlbumView from '$lib/components/AlbumView.svelte';
   import VolumeControl from '$lib/components/VolumeControl.svelte';
@@ -23,6 +24,8 @@
     resume,
     playNext,
     playPrev,
+    playShuffledAll,
+    isShuffled,
     initVolume,
     loadLastTrack,
   } from '$lib/stores/player';
@@ -149,7 +152,7 @@
       >
         <div class="now-playing-art">
           {#if $currentAlbum?.cover_art}
-            <img src={$currentAlbum.cover_art} alt="" />
+            <img src={convertFileSrc($currentAlbum.cover_art)} alt="" />
           {:else}
             <span>♪</span>
           {/if}
@@ -170,10 +173,10 @@
         <PS2Btn type="circle" />
         <span class="btn-label">Back</span>
       </div>
-      <div class="action-hint">
+      <button class="action-hint action-btn" onclick={() => playShuffledAll($albums)}>
         <PS2Btn type="square" />
-        <span class="btn-label">Shuffle</span>
-      </div>
+        <span class="btn-label" class:active-shuffle={$isShuffled}>Shuffle</span>
+      </button>
       <button class="action-hint action-btn" onclick={() => optionsOpen = true}>
         <PS2Btn type="triangle" />
         <span class="btn-label">Options</span>
@@ -270,6 +273,9 @@
     display: flex;
     align-items: flex-start;
     gap: 12px;
+    min-width: 0;
+    max-width: 50%;
+    overflow: hidden;
   }
 
   .scanning {
@@ -284,6 +290,9 @@
     color: var(--track-active);
     letter-spacing: 0.01em;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
     line-height: 1;
     animation: fadein 0.15s ease;
   }
@@ -482,4 +491,6 @@
     color: var(--text-secondary);
     letter-spacing: 0.03em;
   }
+
+  .active-shuffle { color: var(--track-active); }
 </style>
