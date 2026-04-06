@@ -37,6 +37,13 @@ export async function loadCache(): Promise<boolean> {
       albums.update((a) => [...a, e.payload]);
     }));
 
+    // Cover art arrives separately after metadata — update matching album
+    unlisten.push(await listen<{ id: string; cover_art: string }>('cache:cover', (e) => {
+      albums.update((a) =>
+        a.map((album) => album.id === e.payload.id ? { ...album, cover_art: e.payload.cover_art } : album)
+      );
+    }));
+
     unlisten.push(await listen<void>('scan:done', () => {
       unlisten.forEach(u => u());
       resolve(true);

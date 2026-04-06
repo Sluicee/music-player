@@ -48,9 +48,9 @@ fn format_size(bytes: u64) -> String {
     const GB: u64 = 1_073_741_824;
     const MB: u64 = 1_048_576;
     if bytes >= GB {
-        format!("{:.1} GB", bytes as f64 / GB as f64)
+        format!("{:.3} GB", bytes as f64 / GB as f64)
     } else {
-        format!("{:.0} MB", bytes as f64 / MB as f64)
+        format!("{:.3} MB", bytes as f64 / MB as f64)
     }
 }
 
@@ -58,25 +58,46 @@ fn format_size(bytes: u64) -> String {
 
 #[tauri::command]
 fn save_library_cache(data: String, app: tauri::AppHandle) -> Result<(), String> {
-    let path = app.path().app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("library_cache.json");
-    std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
-    std::fs::write(&path, data).map_err(|e| e.to_string())
+    let base_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&base_dir).map_err(|e| e.to_string())?;
+
+    // Parse incoming albums and split into meta (no cover_art) + covers map
+    let albums: Vec<serde_json::Value> = serde_json::from_str(&data).map_err(|e| e.to_string())?;
+
+    let mut covers: serde_json::Map<String, serde_json::Value> = serde_json::Map::new();
+    let meta: Vec<serde_json::Value> = albums.into_iter().map(|mut album| {
+        if let Some(obj) = album.as_object_mut() {
+            if let Some(id) = obj.get("id").and_then(|v| v.as_str()).map(String::from) {
+                if let Some(cover) = obj.remove("cover_art") {
+                    if !cover.is_null() {
+                        covers.insert(id, cover);
+                    }
+                }
+                obj.insert("cover_art".to_string(), serde_json::Value::Null);
+            }
+        }
+        album
+    }).collect();
+
+    std::fs::write(base_dir.join("library_meta.json"), serde_json::to_string(&meta).unwrap())
+        .map_err(|e| e.to_string())?;
+    std::fs::write(base_dir.join("library_covers.json"), serde_json::to_string(&covers).unwrap())
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 #[tauri::command]
 async fn load_library_cache(app: tauri::AppHandle) -> Result<bool, String> {
-    let path = app.path().app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("library_cache.json");
+    let base_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let meta_path = base_dir.join("library_meta.json");
 
-    let data = match std::fs::read_to_string(&path) {
+    let meta_data = match std::fs::read_to_string(&meta_path) {
         Ok(s) => s,
         Err(_) => return Ok(false),
     };
 
-    let albums: Vec<serde_json::Value> = match serde_json::from_str(&data) {
+    let albums: Vec<serde_json::Value> = match serde_json::from_str(&meta_data) {
         Ok(v) => v,
         Err(e) => return Err(e.to_string()),
     };
@@ -85,10 +106,22 @@ async fn load_library_cache(app: tauri::AppHandle) -> Result<bool, String> {
         return Ok(false);
     }
 
-    for album in albums {
-        app.emit("scan:album", &album).ok();
+    // Phase 1: emit all albums without covers — instant
+    for album in &albums {
+        app.emit("scan:album", album).ok();
     }
     app.emit("scan:done", ()).ok();
+
+    // Phase 2: stream covers in background
+    let covers_path = base_dir.join("library_covers.json");
+    let app2 = app.clone();
+    tokio::task::spawn_blocking(move || {
+        let Ok(covers_data) = std::fs::read_to_string(&covers_path) else { return };
+        let Ok(covers) = serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&covers_data) else { return };
+        for (id, cover_art) in covers {
+            app2.emit("cache:cover", serde_json::json!({ "id": id, "cover_art": cover_art })).ok();
+        }
+    });
 
     Ok(true)
 }
