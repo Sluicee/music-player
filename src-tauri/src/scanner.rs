@@ -149,14 +149,36 @@ fn find_folder_cover(audio_path: &Path, album_id: &str, covers_dir: &Path) -> Op
     None
 }
 
-/// Decode, resize to max 600px, and save as JPEG to covers_dir.
-/// Skips processing if the destination already exists (fast rescan).
+/// Write embedded tag cover bytes directly — no decode/resize needed since
+/// tag art is already small (ID3 embeds are typically ≤ 600px).
+fn save_embedded_cover(data: &[u8], mime: &str, album_id: &str, covers_dir: &Path) -> Option<String> {
+    let dest = covers_dir.join(cover_filename(album_id, mime));
+    if dest.exists() {
+        return Some(dest.to_string_lossy().into_owned());
+    }
+    std::fs::write(&dest, data).ok()?;
+    Some(dest.to_string_lossy().into_owned())
+}
+
+/// Write pre-sized cover bytes (e.g. iTunes 600×600) directly without decode.
 pub fn save_cover_bytes(data: &[u8], album_id: &str, covers_dir: &Path) -> Option<String> {
     let dest = covers_dir.join(cover_filename(album_id, "image/jpeg"));
     if dest.exists() {
         return Some(dest.to_string_lossy().into_owned());
     }
-    let img = image::load_from_memory(data).ok()?;
+    std::fs::write(&dest, data).ok()?;
+    Some(dest.to_string_lossy().into_owned())
+}
+
+/// Copy a folder image, resizing to max 600px if needed.
+/// Folder art can be 3000+ px, so we decode and resize.
+fn copy_image_to_covers(src: &Path, album_id: &str, covers_dir: &Path) -> Option<String> {
+    let dest = covers_dir.join(cover_filename(album_id, "image/jpeg"));
+    if dest.exists() {
+        return Some(dest.to_string_lossy().into_owned());
+    }
+    let data = std::fs::read(src).ok()?;
+    let img = image::load_from_memory(&data).ok()?;
     let img = if img.width() > 600 || img.height() > 600 {
         img.resize(600, 600, image::imageops::FilterType::Triangle)
     } else {
@@ -164,15 +186,6 @@ pub fn save_cover_bytes(data: &[u8], album_id: &str, covers_dir: &Path) -> Optio
     };
     img.save_with_format(&dest, image::ImageFormat::Jpeg).ok()?;
     Some(dest.to_string_lossy().into_owned())
-}
-
-fn copy_image_to_covers(src: &Path, album_id: &str, covers_dir: &Path) -> Option<String> {
-    let dest = covers_dir.join(cover_filename(album_id, "image/jpeg"));
-    if dest.exists() {
-        return Some(dest.to_string_lossy().into_owned());
-    }
-    let data = std::fs::read(src).ok()?;
-    save_cover_bytes(&data, album_id, covers_dir)
 }
 
 /// Scan a folder and return all albums with embedded or folder-based cover art.
@@ -235,9 +248,9 @@ pub fn scan_folder(folder_path: &str, app: &tauri::AppHandle, covers_dir: &Path)
         });
 
         if album.cover_art.is_none() {
-            // 1. Embedded tag cover — resize to max 600px on save
-            if let Some((data, _mime)) = cover {
-                album.cover_art = save_cover_bytes(&data, &album.id, covers_dir);
+            // 1. Embedded tag cover — write raw bytes directly (already small)
+            if let Some((data, mime)) = cover {
+                album.cover_art = save_embedded_cover(&data, &mime, &album.id, covers_dir);
             }
             // 2. Folder image (if no embedded cover)
             if album.cover_art.is_none() {

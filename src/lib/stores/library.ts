@@ -30,6 +30,9 @@ listen<{ id: string; cover_art: string }>('cover:update', (e) => {
   );
 });
 
+// Save cache once all internet covers have been fetched
+listen<void>('cover:fetch:done', () => { saveCache(); });
+
 // ── Cache persistence ─────────────────────────────────────────────────────────
 
 async function saveCache() {

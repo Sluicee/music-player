@@ -69,6 +69,9 @@ async fn scan_music_folder(path: String, app: tauri::AppHandle) -> Result<String
             .buffer_unordered(8)
             .collect::<()>()
             .await;
+
+        // Signal frontend to re-save cache with updated cover paths
+        app2.emit("cover:fetch:done", ()).ok();
     });
 
     let size = tokio::task::spawn_blocking(move || calculate_library_size(&path))
