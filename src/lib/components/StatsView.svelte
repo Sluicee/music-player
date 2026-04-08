@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { convertFileSrc } from '@tauri-apps/api/core';
-  import PS2Btn from './PS2Btn.svelte';
-  import { loadStats, clearStats, type StatsMap } from '../stores/stats';
-  import type { Album, Track } from '../types';
-  import { playUiSfx } from '$lib/ui-sfx';
+  import { convertFileSrc } from "@tauri-apps/api/core";
+  import PS2Btn from "./PS2Btn.svelte";
+  import { loadStats, clearStats, type StatsMap } from "../stores/stats";
+  import type { Album, Track } from "../types";
+  import { playUiSfx } from "$lib/ui-sfx";
 
   let { albums, onclose }: { albums: Album[]; onclose: () => void } = $props();
 
@@ -51,14 +51,25 @@
           totalListened: ts.totalListened,
         });
 
-        const ae = albumMap.get(album.id) ?? { album, playCount: 0, lastPlayed: 0, totalListened: 0 };
+        const ae = albumMap.get(album.id) ?? {
+          album,
+          playCount: 0,
+          lastPlayed: 0,
+          totalListened: 0,
+        };
         ae.playCount += ts.playCount;
         ae.lastPlayed = Math.max(ae.lastPlayed, ts.lastPlayed);
         ae.totalListened += ts.totalListened;
         albumMap.set(album.id, ae);
 
-        const artistName = track.artist || album.artist || 'Unknown Artist';
-        const are = artistMap.get(artistName) ?? { artist: artistName, playCount: 0, lastPlayed: 0, totalListened: 0, coverArt: album.cover_art };
+        const artistName = track.artist || album.artist || "Unknown Artist";
+        const are = artistMap.get(artistName) ?? {
+          artist: artistName,
+          playCount: 0,
+          lastPlayed: 0,
+          totalListened: 0,
+          coverArt: album.cover_art,
+        };
         are.playCount += ts.playCount;
         are.lastPlayed = Math.max(are.lastPlayed, ts.lastPlayed);
         are.totalListened += ts.totalListened;
@@ -67,35 +78,67 @@
       }
     }
 
-    const tracks = [...trackMap.values()].sort((a, b) => b.playCount - a.playCount).slice(0, 12);
-    const albumsTop = [...albumMap.values()].sort((a, b) => b.playCount - a.playCount).slice(0, 8);
-    const artistsTop = [...artistMap.values()].sort((a, b) => b.playCount - a.playCount).slice(0, 8);
-    const recent = [...trackMap.values()].sort((a, b) => b.lastPlayed - a.lastPlayed).slice(0, 10);
+    const tracks = [...trackMap.values()]
+      .sort((a, b) => b.playCount - a.playCount)
+      .slice(0, 12);
+    const albumsTop = [...albumMap.values()]
+      .sort((a, b) => b.playCount - a.playCount)
+      .slice(0, 8);
+    const artistsTop = [...artistMap.values()]
+      .sort((a, b) => b.playCount - a.playCount)
+      .slice(0, 8);
+    const recent = [...trackMap.values()]
+      .sort((a, b) => b.lastPlayed - a.lastPlayed)
+      .slice(0, 10);
 
-    const totalPlays = Object.values(s).reduce((acc, t) => acc + t.playCount, 0);
-    const totalListened = Object.values(s).reduce((acc, t) => acc + t.totalListened, 0);
-    const uniqueTracks = Object.values(s).filter(t => t.playCount > 0).length;
+    const totalPlays = Object.values(s).reduce(
+      (acc, t) => acc + t.playCount,
+      0,
+    );
+    const totalListened = Object.values(s).reduce(
+      (acc, t) => acc + t.totalListened,
+      0,
+    );
+    const uniqueTracks = Object.values(s).filter((t) => t.playCount > 0).length;
     const uniqueArtists = artistMap.size;
 
-    return { tracks, albumsTop, artistsTop, recent, totalPlays, totalListened, uniqueTracks, uniqueArtists };
+    return {
+      tracks,
+      albumsTop,
+      artistsTop,
+      recent,
+      totalPlays,
+      totalListened,
+      uniqueTracks,
+      uniqueArtists,
+    };
   }
 
   let stats = $state(buildStats());
+  let confirming = $state(false);
 
   function handleClear() {
-    playUiSfx('confirm');
+    if (!confirming) {
+      playUiSfx("confirm");
+      confirming = true;
+      setTimeout(() => (confirming = false), 3000);
+      return;
+    }
+
+    playUiSfx("scan");
     clearStats();
     stats = buildStats();
+    confirming = false;
   }
 
   function setActiveTab(tab: Tab) {
     if (activeTab === tab) return;
-    playUiSfx('steps');
+    playUiSfx("steps");
     activeTab = tab;
   }
 
   function handleClose() {
-    playUiSfx('back');
+    playUiSfx("back");
     onclose();
   }
 
@@ -115,10 +158,10 @@
   }
 
   function fmtDate(ms: number): string {
-    if (!ms) return '—';
+    if (!ms) return "—";
     const diff = Date.now() - ms;
     const min = Math.floor(diff / 60000);
-    if (min < 1) return 'just now';
+    if (min < 1) return "just now";
     if (min < 60) return `${min}m ago`;
     const h = Math.floor(min / 60);
     if (h < 24) return `${h}h ago`;
@@ -129,14 +172,13 @@
 
   // ── Tab state ─────────────────────────────────────────────────────────────────
 
-  type Tab = 'artists' | 'albums' | 'tracks' | 'recent';
-  let activeTab = $state<Tab>('artists');
+  type Tab = "artists" | "albums" | "tracks" | "recent";
+  let activeTab = $state<Tab>("artists");
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="overlay" onmousedown={handleOverlayMouseDown}>
   <div class="panel">
-
     <!-- Summary row -->
     <div class="summary">
       <div class="stat-card">
@@ -159,16 +201,31 @@
 
     <!-- Tabs -->
     <div class="tabs">
-      <button class="tab" class:active={activeTab === 'artists'} onclick={() => setActiveTab('artists')}>Artists</button>
-      <button class="tab" class:active={activeTab === 'albums'} onclick={() => setActiveTab('albums')}>Albums</button>
-      <button class="tab" class:active={activeTab === 'tracks'} onclick={() => setActiveTab('tracks')}>Tracks</button>
-      <button class="tab" class:active={activeTab === 'recent'} onclick={() => setActiveTab('recent')}>Recent</button>
+      <button
+        class="tab"
+        class:active={activeTab === "artists"}
+        onclick={() => setActiveTab("artists")}>Artists</button
+      >
+      <button
+        class="tab"
+        class:active={activeTab === "albums"}
+        onclick={() => setActiveTab("albums")}>Albums</button
+      >
+      <button
+        class="tab"
+        class:active={activeTab === "tracks"}
+        onclick={() => setActiveTab("tracks")}>Tracks</button
+      >
+      <button
+        class="tab"
+        class:active={activeTab === "recent"}
+        onclick={() => setActiveTab("recent")}>Recent</button
+      >
     </div>
 
     <!-- Content -->
     <div class="list">
-
-      {#if activeTab === 'artists'}
+      {#if activeTab === "artists"}
         {#if stats.artistsTop.length === 0}
           <p class="empty">No plays yet</p>
         {:else}
@@ -176,7 +233,11 @@
             <div class="row">
               <span class="rank">#{i + 1}</span>
               {#if entry.coverArt}
-                <img class="thumb thumb--round" src={convertFileSrc(entry.coverArt)} alt="" />
+                <img
+                  class="thumb"
+                  src={convertFileSrc(entry.coverArt)}
+                  alt=""
+                />
               {:else}
                 <div class="thumb thumb--round thumb--empty">♪</div>
               {/if}
@@ -191,8 +252,7 @@
             </div>
           {/each}
         {/if}
-
-      {:else if activeTab === 'albums'}
+      {:else if activeTab === "albums"}
         {#if stats.albumsTop.length === 0}
           <p class="empty">No plays yet</p>
         {:else}
@@ -200,13 +260,19 @@
             <div class="row">
               <span class="rank">#{i + 1}</span>
               {#if entry.album.cover_art}
-                <img class="thumb" src={convertFileSrc(entry.album.cover_art)} alt="" />
+                <img
+                  class="thumb"
+                  src={convertFileSrc(entry.album.cover_art)}
+                  alt=""
+                />
               {:else}
                 <div class="thumb thumb--empty">♪</div>
               {/if}
               <div class="row-info">
                 <span class="row-title">{entry.album.title}</span>
-                <span class="row-sub">{entry.album.artist} · last {fmtDate(entry.lastPlayed)}</span>
+                <span class="row-sub"
+                  >{entry.album.artist} · last {fmtDate(entry.lastPlayed)}</span
+                >
               </div>
               <div class="row-right">
                 <span class="play-count">{entry.playCount}</span>
@@ -215,8 +281,7 @@
             </div>
           {/each}
         {/if}
-
-      {:else if activeTab === 'tracks'}
+      {:else if activeTab === "tracks"}
         {#if stats.tracks.length === 0}
           <p class="empty">No plays yet</p>
         {:else}
@@ -225,7 +290,9 @@
               <span class="rank">#{i + 1}</span>
               <div class="row-info">
                 <span class="row-title">{entry.track.title}</span>
-                <span class="row-sub">{entry.track.artist} · {entry.album.title}</span>
+                <span class="row-sub"
+                  >{entry.track.artist} · {entry.album.title}</span
+                >
               </div>
               <div class="row-right">
                 <span class="play-count">{entry.playCount}</span>
@@ -234,31 +301,33 @@
             </div>
           {/each}
         {/if}
-
+      {:else if stats.recent.length === 0}
+        <p class="empty">No plays yet</p>
       {:else}
-        {#if stats.recent.length === 0}
-          <p class="empty">No plays yet</p>
-        {:else}
-          {#each stats.recent as entry (entry.track.id)}
-            <div class="row">
-              {#if entry.album.cover_art}
-                <img class="thumb" src={convertFileSrc(entry.album.cover_art)} alt="" />
-              {:else}
-                <div class="thumb thumb--empty">♪</div>
-              {/if}
-              <div class="row-info">
-                <span class="row-title">{entry.track.title}</span>
-                <span class="row-sub">{entry.track.artist} · {entry.album.title}</span>
-              </div>
-              <div class="row-right">
-                <span class="row-sub">{fmtDate(entry.lastPlayed)}</span>
-                <span class="play-count-sm">×{entry.playCount}</span>
-              </div>
+        {#each stats.recent as entry (entry.track.id)}
+          <div class="row">
+            {#if entry.album.cover_art}
+              <img
+                class="thumb"
+                src={convertFileSrc(entry.album.cover_art)}
+                alt=""
+              />
+            {:else}
+              <div class="thumb thumb--empty">♪</div>
+            {/if}
+            <div class="row-info">
+              <span class="row-title">{entry.track.title}</span>
+              <span class="row-sub"
+                >{entry.track.artist} · {entry.album.title}</span
+              >
             </div>
-          {/each}
-        {/if}
+            <div class="row-right">
+              <span class="row-sub">{fmtDate(entry.lastPlayed)}</span>
+              <span class="play-count-sm">×{entry.playCount}</span>
+            </div>
+          </div>
+        {/each}
       {/if}
-
     </div>
 
     <!-- Footer hints -->
@@ -267,9 +336,10 @@
         <PS2Btn type="circle" />
         <span>Back</span>
       </button>
-      <button class="clear-btn" onclick={handleClear}>Clear stats</button>
+      <button class="clear-btn" class:confirming onclick={handleClear}>
+        {confirming ? "Are you sure?" : "Clear stats"}
+      </button>
     </div>
-
   </div>
 </div>
 
@@ -287,8 +357,12 @@
   }
 
   @keyframes fade-in {
-    from { opacity: 0; }
-    to   { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   .panel {
@@ -301,8 +375,14 @@
   }
 
   @keyframes slide-in {
-    from { opacity: 0; transform: translateY(16px) scale(0.97); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
+    from {
+      opacity: 0;
+      transform: translateY(16px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
 
   /* ── Summary ── */
@@ -356,7 +436,9 @@
     padding: 5px 0;
     border-radius: 6px;
     letter-spacing: 0.04em;
-    transition: background 0.15s, color 0.15s;
+    transition:
+      background 0.15s,
+      color 0.15s;
   }
 
   .tab.active {
@@ -375,8 +457,13 @@
     min-height: 0;
   }
 
-  .list::-webkit-scrollbar { width: 3px; }
-  .list::-webkit-scrollbar-thumb { background: var(--text-dim); border-radius: 2px; }
+  .list::-webkit-scrollbar {
+    width: 3px;
+  }
+  .list::-webkit-scrollbar-thumb {
+    background: var(--text-dim);
+    border-radius: 2px;
+  }
 
   .empty {
     text-align: center;
@@ -391,11 +478,13 @@
     gap: 8px;
     padding: 6px 8px;
     border-radius: 6px;
-    background: rgba(255,255,255,0.02);
+    background: rgba(255, 255, 255, 0.02);
     transition: background 0.1s;
   }
 
-  .row:hover { background: rgba(255,255,255,0.05); }
+  .row:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
 
   .rank {
     font-size: 10px;
@@ -491,7 +580,9 @@
     transition: color 0.15s;
   }
 
-  .hint-btn:hover { color: var(--text-primary); }
+  .hint-btn:hover {
+    color: var(--text-primary);
+  }
 
   .clear-btn {
     background: none;
@@ -502,12 +593,20 @@
     font-family: inherit;
     color: var(--text-dim);
     padding: 4px 10px;
-    transition: color 0.15s, border-color 0.15s;
+    transition:
+      color 0.15s,
+      border-color 0.15s;
     letter-spacing: 0.04em;
   }
 
   .clear-btn:hover {
     color: var(--text-secondary);
     border-color: rgba(90, 95, 120, 0.6);
+  }
+
+  .clear-btn.confirming {
+    color: #ff4d4d;
+    border-color: #ff4d4d;
+    font-weight: 700;
   }
 </style>
