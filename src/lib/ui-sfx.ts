@@ -1,3 +1,6 @@
+import { browser } from '$app/environment';
+import { writable, get } from 'svelte/store';
+
 const SOURCES = {
   confirm: '/sfx/confirm.wav',
   back: '/sfx/back.wav',
@@ -17,6 +20,27 @@ const DEFAULT_VOLUMES: Record<UiSfxName, number> = {
 };
 
 export type UiSfxName = keyof typeof SOURCES;
+
+// Persistence logic
+const STORAGE_KEY = 'mc_sfx_enabled';
+
+function getInitialState() {
+  if (browser) {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored !== null) {
+      return stored === 'true';
+    }
+  }
+  return true;
+}
+
+export const sfxEnabled = writable(getInitialState());
+
+if (browser) {
+  sfxEnabled.subscribe(value => {
+    localStorage.setItem(STORAGE_KEY, value.toString());
+  });
+}
 
 const templates = new Map<UiSfxName, HTMLAudioElement>();
 
@@ -40,6 +64,8 @@ export function primeUiSfx() {
 }
 
 export function playUiSfx(name: UiSfxName, volume = DEFAULT_VOLUMES[name]) {
+  if (!get(sfxEnabled)) return;
+
   const template = getTemplate(name);
   if (!template) return;
 

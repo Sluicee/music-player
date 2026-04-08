@@ -5,7 +5,7 @@
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
   import PS2Btn from './PS2Btn.svelte';
-  import { playUiSfx } from '$lib/ui-sfx';
+  import { playUiSfx, sfxEnabled } from '$lib/ui-sfx';
   import { onMount } from 'svelte';
 
   let { onclose, onStats }: { onclose: () => void; onStats: () => void } = $props();
@@ -32,6 +32,11 @@
     } catch (e) {
       console.error('Failed to toggle autostart:', e);
     }
+  }
+
+  function toggleSfx() {
+    sfxEnabled.update(n => !n);
+    playUiSfx('confirm');
   }
 
   async function addFolder() {
@@ -83,9 +88,11 @@
     { label: 'Add new folder',  action: addFolder  },
     { label: 'Refresh library', action: refresh    },
     { label: 'Statistics',      action: openStats  },
+    { label: `SFX: ${$sfxEnabled ? 'ON' : 'OFF'}`, action: toggleSfx },
     { label: `Launch at startup: ${autostartEnabled ? 'ON' : 'OFF'}`, action: toggleAutostart },
     { label: 'Clear library',   action: clear      },
   ]);
+
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
