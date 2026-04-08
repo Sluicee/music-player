@@ -17,6 +17,7 @@ const MAX_DECODE_RETRIES: usize = 3;
 
 enum Cmd {
     Play { path: String, duration: f64 },
+    Preload { path: String },
     Seek { position: f64 },
     Pause,
     Resume,
@@ -318,10 +319,19 @@ fn build_sink(
     volume: f32,
     seek_secs: f64,
 ) -> Result<Sink, String> {
+    let source = SeekableSource::open(path)?;
+    build_sink_from_source(handle, source, volume, seek_secs)
+}
+
+fn build_sink_from_source(
+    handle: &OutputStreamHandle,
+    mut source: SeekableSource,
+    volume: f32,
+    seek_secs: f64,
+) -> Result<Sink, String> {
     let sink = Sink::try_new(handle).map_err(|e| e.to_string())?;
     sink.set_volume(volume);
 
-    let mut source = SeekableSource::open(path)?;
     if seek_secs > 0.0 {
         source
             .try_seek(Duration::from_secs_f64(seek_secs))
@@ -349,6 +359,7 @@ impl AudioPlayer {
             };
 
             let mut sink: Option<Sink> = None;
+            let mut preloaded: Option<(String, SeekableSource)> = None;
 
             loop {
                 let cmd = match rx.recv_timeout(Duration::from_millis(500)) {
@@ -375,7 +386,18 @@ impl AudioPlayer {
                         eprintln!("[audio] Play: {path}");
                         let volume = state_thread.lock().unwrap().volume;
 
-                        match build_sink(&handle, &path, volume, 0.0) {
+                        let build_res = if let Some((p, src)) = preloaded.take() {
+                            if p == path {
+                                eprintln!("[audio] Using preloaded source for {path}");
+                                build_sink_from_source(&handle, src, volume, 0.0)
+                            } else {
+                                build_sink(&handle, &path, volume, 0.0)
+                            }
+                        } else {
+                            build_sink(&handle, &path, volume, 0.0)
+                        };
+
+                        match build_res {
                             Ok(new_sink) => {
                                 if let Some(old_sink) = sink.replace(new_sink) {
                                     old_sink.stop();
@@ -390,6 +412,18 @@ impl AudioPlayer {
                                 st.elapsed_before_pause = 0.0;
                             }
                             Err(e) => eprintln!("[audio] Play failed: {e}"),
+                        }
+                    }
+                    Cmd::Preload { path } => {
+                        if preloaded.as_ref().map(|(p, _)| p == &path).unwrap_or(false) {
+                            continue;
+                        }
+                        match SeekableSource::open(&path) {
+                            Ok(src) => {
+                                eprintln!("[audio] Preloaded: {path}");
+                                preloaded = Some((path, src));
+                            }
+                            Err(e) => eprintln!("[audio] Preload failed for {path}: {e}"),
                         }
                     }
                     Cmd::Seek { position } => {
@@ -519,6 +553,12 @@ impl AudioPlayer {
                 duration,
             })
             .map_err(|e| e.to_string())
+    }
+
+    pub fn preload(&self, path: &str) {
+        let _ = self.tx.send(Cmd::Preload {
+            path: path.to_string(),
+        });
     }
 
     pub fn seek(&self, position: f64) {

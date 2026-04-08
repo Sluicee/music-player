@@ -60,6 +60,47 @@ export function toggleRepeat() {
     isShuffled.set(false);
     currentPlaylistId.set(null);
   }
+  preloadNext();
+}
+
+/**
+ * Calculates the likely next track based on the current state (repeat, shuffle, album).
+ */
+function getNextTrack(): Track | null {
+  const rm = get(repeatMode);
+  const curTrack = get(currentTrack);
+  const album = get(currentAlbum);
+
+  if (rm === 'one') return curTrack;
+
+  if (_queue.length > 0) {
+    const nextIdx = _qIdx + 1;
+    if (nextIdx < _queue.length) return _queue[nextIdx].track;
+    if (rm === 'all') return _queue[0].track;
+    return null;
+  }
+
+  if (album && curTrack) {
+    const idx = album.tracks.findIndex(t => t.id === curTrack.id);
+    if (idx !== -1) {
+      const nextIdx = idx + 1;
+      if (nextIdx < album.tracks.length) return album.tracks[nextIdx];
+      if (rm === 'all') return album.tracks[0];
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Tells the backend to prepare the next track's file and decoder in advance.
+ */
+export async function preloadNext() {
+  const next = getNextTrack();
+  if (next) {
+    console.log('[player] Preloading next track:', next.title);
+    await invoke('audio_preload', { path: next.path });
+  }
 }
 
 // ── Shuffle queue (module-level, not reactive) ────────────────────────────────
@@ -163,6 +204,7 @@ export async function playTrack(track: Track, album: Album, fromShuffle = false)
     isPaused.set(false);
     saveLastTrack(track, album);
     startPolling();
+    preloadNext();
   } catch (e) {
     console.error('Play failed:', e);
   }
@@ -282,6 +324,7 @@ export async function playShuffledAll(albums: Album[]) {
     _queue = [{ track: current, album: currentAlbumVal }, ...fisherYates(rest)];
     _qIdx = 0;
     isShuffled.set(true);
+    preloadNext();
   } else {
     _queue = fisherYates(all);
     _qIdx = 0;
@@ -306,6 +349,7 @@ export async function playShuffled(album: Album) {
     _queue = [{ track: current, album }, ...fisherYates(rest)];
     _qIdx = 0;
     isShuffled.set(true);
+    preloadNext();
   } else {
     _queue = fisherYates(album.tracks.map(t => ({ track: t, album })));
     _qIdx = 0;
@@ -335,6 +379,7 @@ export async function playShuffledPlaylist(items: QueueItem[], playlistId: strin
     _qIdx = 0;
     isShuffled.set(true);
     currentPlaylistId.set(playlistId);
+    preloadNext();
   } else {
     _queue = fisherYates([...items]);
     _qIdx = 0;

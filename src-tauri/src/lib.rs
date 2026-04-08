@@ -215,6 +215,11 @@ fn audio_play(
 }
 
 #[tauri::command]
+fn audio_preload(path: String, player: tauri::State<SharedPlayer>) {
+    player.preload(&path);
+}
+
+#[tauri::command]
 fn audio_pause(player: tauri::State<SharedPlayer>) {
     player.pause();
 }
@@ -349,6 +354,7 @@ pub fn run() {
             scan_music_folder,
             get_library_size,
             audio_play,
+            audio_preload,
             audio_pause,
             audio_resume,
             audio_stop,
