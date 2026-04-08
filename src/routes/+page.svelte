@@ -1,5 +1,6 @@
 <script lang="ts">
   import { convertFileSrc } from '@tauri-apps/api/core';
+  import { getCurrentWindow } from '@tauri-apps/api/window';
   import AlbumGrid from '$lib/components/AlbumGrid.svelte';
   import AlbumView from '$lib/components/AlbumView.svelte';
   import PlaylistGrid from '$lib/components/PlaylistGrid.svelte';
@@ -181,6 +182,11 @@
 
     // Check for updates in background
     checkForUpdates();
+
+    // Show window once initialization is complete
+    setTimeout(() => {
+      getCurrentWindow().show();
+    }, 35);
   });
 
   function selectAlbum(album: Album) {

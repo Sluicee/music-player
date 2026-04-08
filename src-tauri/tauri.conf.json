@@ -15,7 +15,9 @@
         "title": "Memory Card",
         "width": 950,
         "height": 900,
-        "resizable": false
+        "resizable": false,
+        "visible": false,
+        "backgroundColor": "#e8ecf4"
       }
     ],
     "security": {
