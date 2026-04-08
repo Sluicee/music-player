@@ -1,4 +1,5 @@
 use lofty::prelude::*;
+use any_ascii::any_ascii;
 use lofty::probe::Probe;
 use lofty::tag::ItemKey;
 use rayon::prelude::*;
@@ -22,6 +23,8 @@ pub struct Track {
     pub disc_number: u32,
     pub duration: f64,
     pub year: Option<u32>,
+    #[serde(default)]
+    pub search_index: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -33,6 +36,8 @@ pub struct Album {
     pub cover_art: Option<String>,
     pub tracks: Vec<Track>,
     pub total_duration: f64,
+    #[serde(default)]
+    pub search_index: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -101,6 +106,11 @@ fn read_track_and_cover(path: &Path) -> Option<TrackResult> {
             (pic.data().to_vec(), mime)
         });
 
+    let search_index = format!(
+        "{} {}",
+        any_ascii(&title).to_lowercase(),
+        any_ascii(&artist).to_lowercase()
+    );
     Some(TrackResult {
         track: Track {
             id: path_str.clone(),
@@ -113,6 +123,7 @@ fn read_track_and_cover(path: &Path) -> Option<TrackResult> {
             disc_number,
             duration,
             year,
+            search_index,
         },
         cover,
     })
@@ -288,6 +299,11 @@ pub fn scan_folder(folder_path: &str, app: &tauri::AppHandle, covers_dir: &Path)
             cover_art: None,
             tracks: Vec::new(),
             total_duration: 0.0,
+            search_index: format!(
+                "{} {}",
+                any_ascii(track.album.trim()).to_lowercase(),
+                any_ascii(track.album_artist.trim()).to_lowercase()
+            ),
         });
 
         if album.cover_art.is_none() {

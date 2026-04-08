@@ -64,6 +64,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "any_ascii"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90c6333e01ba7235575b6ab53e5af10f1c327927fd97c36462917e289557ea64"
+
+[[package]]
 name = "anyhow"
 version = "1.0.102"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2641,6 +2647,7 @@ dependencies = [
 name = "musicplayer"
 version = "0.1.0"
 dependencies = [
+ "any_ascii",
  "base64 0.22.1",
  "discord-rich-presence",
  "futures",

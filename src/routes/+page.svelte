@@ -65,9 +65,11 @@
           return $albums.filter(a =>
             a.title.toLowerCase().includes(q) ||
             a.artist.toLowerCase().includes(q) ||
+            a.search_index?.toLowerCase().includes(q) ||
             a.tracks.some(t =>
               t.title.toLowerCase().includes(q) ||
-              t.artist.toLowerCase().includes(q)
+              t.artist.toLowerCase().includes(q) ||
+              t.search_index?.toLowerCase().includes(q)
             )
           );
         })()

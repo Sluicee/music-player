@@ -9,6 +9,7 @@ export interface Track {
   disc_number: number;
   duration: number;
   year: number | null;
+  search_index: string;
 }
 
 export interface Album {
@@ -19,4 +20,5 @@ export interface Album {
   cover_art: string | null;
   tracks: Track[];
   total_duration: number;
+  search_index: string;
 }
