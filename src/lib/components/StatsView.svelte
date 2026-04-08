@@ -24,10 +24,19 @@
     totalListened: number;
   }
 
+  interface ArtistEntry {
+    artist: string;
+    playCount: number;
+    lastPlayed: number;
+    totalListened: number;
+    coverArt: string | null;
+  }
+
   function buildStats() {
     const s: StatsMap = loadStats();
     const trackMap = new Map<string, TrackEntry>();
     const albumMap = new Map<string, AlbumEntry>();
+    const artistMap = new Map<string, ArtistEntry>();
 
     for (const album of albums) {
       for (const track of album.tracks) {
@@ -47,18 +56,28 @@
         ae.lastPlayed = Math.max(ae.lastPlayed, ts.lastPlayed);
         ae.totalListened += ts.totalListened;
         albumMap.set(album.id, ae);
+
+        const artistName = track.artist || album.artist || 'Unknown Artist';
+        const are = artistMap.get(artistName) ?? { artist: artistName, playCount: 0, lastPlayed: 0, totalListened: 0, coverArt: album.cover_art };
+        are.playCount += ts.playCount;
+        are.lastPlayed = Math.max(are.lastPlayed, ts.lastPlayed);
+        are.totalListened += ts.totalListened;
+        if (!are.coverArt && album.cover_art) are.coverArt = album.cover_art;
+        artistMap.set(artistName, are);
       }
     }
 
     const tracks = [...trackMap.values()].sort((a, b) => b.playCount - a.playCount).slice(0, 12);
     const albumsTop = [...albumMap.values()].sort((a, b) => b.playCount - a.playCount).slice(0, 8);
+    const artistsTop = [...artistMap.values()].sort((a, b) => b.playCount - a.playCount).slice(0, 8);
     const recent = [...trackMap.values()].sort((a, b) => b.lastPlayed - a.lastPlayed).slice(0, 10);
 
     const totalPlays = Object.values(s).reduce((acc, t) => acc + t.playCount, 0);
     const totalListened = Object.values(s).reduce((acc, t) => acc + t.totalListened, 0);
     const uniqueTracks = Object.values(s).filter(t => t.playCount > 0).length;
+    const uniqueArtists = artistMap.size;
 
-    return { tracks, albumsTop, recent, totalPlays, totalListened, uniqueTracks };
+    return { tracks, albumsTop, artistsTop, recent, totalPlays, totalListened, uniqueTracks, uniqueArtists };
   }
 
   let stats = $state(buildStats());
@@ -110,8 +129,8 @@
 
   // ── Tab state ─────────────────────────────────────────────────────────────────
 
-  type Tab = 'albums' | 'tracks' | 'recent';
-  let activeTab = $state<Tab>('albums');
+  type Tab = 'artists' | 'albums' | 'tracks' | 'recent';
+  let activeTab = $state<Tab>('artists');
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -129,13 +148,18 @@
         <span class="stat-lbl">total listened</span>
       </div>
       <div class="stat-card">
+        <span class="stat-val">{stats.uniqueArtists}</span>
+        <span class="stat-lbl">artists</span>
+      </div>
+      <div class="stat-card">
         <span class="stat-val">{stats.uniqueTracks}</span>
-        <span class="stat-lbl">unique tracks</span>
+        <span class="stat-lbl">tracks</span>
       </div>
     </div>
 
     <!-- Tabs -->
     <div class="tabs">
+      <button class="tab" class:active={activeTab === 'artists'} onclick={() => setActiveTab('artists')}>Artists</button>
       <button class="tab" class:active={activeTab === 'albums'} onclick={() => setActiveTab('albums')}>Albums</button>
       <button class="tab" class:active={activeTab === 'tracks'} onclick={() => setActiveTab('tracks')}>Tracks</button>
       <button class="tab" class:active={activeTab === 'recent'} onclick={() => setActiveTab('recent')}>Recent</button>
@@ -144,7 +168,31 @@
     <!-- Content -->
     <div class="list">
 
-      {#if activeTab === 'albums'}
+      {#if activeTab === 'artists'}
+        {#if stats.artistsTop.length === 0}
+          <p class="empty">No plays yet</p>
+        {:else}
+          {#each stats.artistsTop as entry, i (entry.artist)}
+            <div class="row">
+              <span class="rank">#{i + 1}</span>
+              {#if entry.coverArt}
+                <img class="thumb thumb--round" src={convertFileSrc(entry.coverArt)} alt="" />
+              {:else}
+                <div class="thumb thumb--round thumb--empty">♪</div>
+              {/if}
+              <div class="row-info">
+                <span class="row-title">{entry.artist}</span>
+                <span class="row-sub">last {fmtDate(entry.lastPlayed)}</span>
+              </div>
+              <div class="row-right">
+                <span class="play-count">{entry.playCount}</span>
+                <span class="row-sub">{fmtTime(entry.totalListened)}</span>
+              </div>
+            </div>
+          {/each}
+        {/if}
+
+      {:else if activeTab === 'albums'}
         {#if stats.albumsTop.length === 0}
           <p class="empty">No plays yet</p>
         {:else}
@@ -363,6 +411,10 @@
     border-radius: 4px;
     object-fit: cover;
     flex-shrink: 0;
+  }
+
+  .thumb--round {
+    border-radius: 50%;
   }
 
   .thumb--empty {
