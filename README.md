@@ -17,6 +17,22 @@ A desktop music player with a retro PS2/CRT aesthetic, built with Tauri 2, Svelt
 - Shuffle, volume control, seek
 - Library cache persisted to disk — fast startup after first scan
 
+## Documentation & Controls
+
+For detailed information on how to organize your music and how the library is scanned, see the **[User Manual](docs/MANUAL.md)** ([RU](docs/MANUAL_RU.md)).
+
+### Hotkeys
+
+| Key | Action |
+| --- | --- |
+| `Space` | Play / Pause |
+| `←` / `→` | Previous / Next Track |
+| `↑` / `↓` | Volume Up / Down |
+| `S` / `R` | Shuffle / Repeat |
+| `F` or `/` | Search |
+| `1` / `2` | Switch Tabs (Library/Playlists) |
+
+
 ## Tech Stack
 
 | Layer    | Technology                                    |
