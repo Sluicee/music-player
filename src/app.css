@@ -93,3 +93,7 @@ button, input, select, textarea {
   text-shadow: var(--text-shadow);
   color: inherit;
 }
+
+button:focus {
+  outline: none;
+}

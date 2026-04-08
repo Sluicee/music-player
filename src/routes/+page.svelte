@@ -35,6 +35,8 @@
     toggleRepeat,
     initVolume,
     loadLastTrack,
+    volume,
+    setVolume,
   } from '$lib/stores/player';
   import { checkForUpdates } from '$lib/stores/updates';
   import { currentTrack as ct, currentAlbum as ca, duration } from '$lib/stores/player';
@@ -84,6 +86,72 @@
       playUiSfx('back');
       searchOpen = false;
       searchQuery = '';
+    }
+  }
+
+  let mutedVolume = 0;
+
+  function handleGlobalKeydown(e: KeyboardEvent) {
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+    const VOL_STEP = 1 / 20;
+
+    switch (e.code) {
+      case 'Space':
+        e.preventDefault();
+        if ($currentTrack) handleTransportPlayPause();
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        if ($currentAlbum) handlePrev();
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        if ($currentAlbum) handleNext();
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        playUiSfx('steps');
+        setVolume(Math.min(1, $volume + VOL_STEP));
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        playUiSfx('steps');
+        setVolume(Math.max(0, $volume - VOL_STEP));
+        break;
+      case 'KeyS':
+        handleShuffleAll();
+        break;
+      case 'KeyR':
+        playUiSfx('confirm');
+        toggleRepeat();
+        break;
+      case 'KeyF':
+      case 'Slash':
+        toggleSearch();
+        break;
+      case 'KeyM':
+        if ($volume > 0) { mutedVolume = $volume; setVolume(0); }
+        else { setVolume(mutedVolume || 1); }
+        playUiSfx('steps');
+        break;
+      case 'Escape':
+        if (optionsOpen)          { optionsOpen = false; }
+        else if (statsOpen)       { statsOpen = false; }
+        else if (npPickerOpen)    { npPickerOpen = false; }
+        else if (selectedPlaylist){ selectedPlaylist = null; }
+        else if ($selectedAlbum)  { selectedAlbum.set(null); followPlayback = false; }
+        else if (searchOpen)      { playUiSfx('back'); searchOpen = false; searchQuery = ''; }
+        break;
+      case 'Digit1':
+        activeTab = 'library';
+        playUiSfx('back');
+        break;
+      case 'Digit2':
+        activeTab = 'playlists';
+        playUiSfx('confirm');
+        break;
     }
   }
 
@@ -162,6 +230,8 @@
     }
   });
 </script>
+
+<svelte:window onkeydown={handleGlobalKeydown} />
 
 <div class="root">
 <div class="shell">
