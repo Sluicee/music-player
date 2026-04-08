@@ -5,7 +5,7 @@ mod discord_rpc;
 
 use audio::{create_player, PlaybackState, SharedPlayer};
 use media_controls::MediaControlsManager;
-use scanner::{calculate_library_size, scan_folder, Album};
+use scanner::{calculate_library_size, scan_folder, Album, cover_filename};
 use tauri_plugin_dialog::DialogExt;
 use tauri::{Manager, Emitter, State};
 use semver::Version;
@@ -28,16 +28,6 @@ fn pick_folder(app: tauri::AppHandle) -> Option<String> {
 }
 
 // ── Native Helpers ────────────────────────────────────────────────────────────
-
-fn sanitize_filename(name: &str) -> String {
-    name.chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-        .collect()
-}
-
-fn cover_filename(id: &str, _mime_type: &str) -> String {
-    format!("{}.jpg", sanitize_filename(id))
-}
 
 fn save_cover_bytes(bytes: &[u8], id: &str, dir: &std::path::Path) -> Option<String> {
     let filename = cover_filename(id, "image/jpeg");

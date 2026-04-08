@@ -291,11 +291,20 @@ pub fn scan_folder(folder_path: &str, app: &tauri::AppHandle, covers_dir: &Path)
         });
 
         if album.cover_art.is_none() {
-            // 1. Embedded tag cover — write raw bytes directly (already small)
-            if let Some((data, mime)) = cover {
-                album.cover_art = save_embedded_cover(&data, &mime, &album.id, covers_dir);
+            // 1. Check cache first (most frequent case for large libraries)
+            let cached_path = covers_dir.join(cover_filename(&album.id, "image/jpeg"));
+            if cached_path.exists() {
+                album.cover_art = Some(cached_path.to_string_lossy().into_owned());
             }
-            // 2. Folder image (if no embedded cover)
+
+            // 2. Embedded tag cover
+            if album.cover_art.is_none() {
+                if let Some((data, mime)) = cover {
+                    album.cover_art = save_embedded_cover(&data, &mime, &album.id, covers_dir);
+                }
+            }
+
+            // 3. Folder image
             if album.cover_art.is_none() {
                 album.cover_art = find_folder_cover(&audio_path, &album.id, covers_dir);
             }
