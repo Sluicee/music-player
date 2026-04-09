@@ -322,16 +322,14 @@
         onclick={() => {
           activeTab = "library";
           playUiSfx("back");
-        }}>Library</button
-      >
+        }}>Library</button>
       <button
         class="tab-opt"
         class:tab-opt--active={activeTab === "playlists"}
         onclick={() => {
           activeTab = "playlists";
           playUiSfx("confirm");
-        }}>Playlists</button
-      >
+        }}>Playlists</button>
     </div>
 
     <!-- Content -->
@@ -677,15 +675,17 @@
   /* ── Tab toggle ── */
   .tab-toggle {
     position: relative;
-    display: inline-flex;
+    display: inline-grid;
+    grid-template-columns: repeat(2, 80px);
     justify-self: start;
-    background: linear-gradient(180deg, rgb(48, 48, 48), rgb(54, 58, 68));
-    border: 1px solid rgba(212, 219, 240, 0.08);
-    border-radius: 5px;
+    background: linear-gradient(180deg, rgb(38, 38, 42), rgb(54, 58, 68));
+    border: 1px solid rgba(212, 219, 240, 0.12);
+    border-radius: 6px;
     padding: 2px;
     box-shadow:
       inset 0 2px 4px rgba(0, 0, 0, 0.5),
-      inset 0 1px 0 rgba(0, 0, 0, 0.3);
+      0 1px 0 rgba(255, 255, 255, 0.05);
+    margin-bottom: 5px;
   }
 
   .tab-thumb {
@@ -694,13 +694,13 @@
     left: 2px;
     height: calc(100% - 4px);
     width: calc(50% - 2px);
-    background: linear-gradient(180deg, #474747, #272727);
-    border-radius: 3px;
-    border: 1px solid rgba(212, 219, 240, 0.1);
+    background: linear-gradient(180deg, #4a4a4f, #2a2a2f);
+    border-radius: 4px;
+    border: 1px solid rgba(212, 219, 240, 0.15);
     box-shadow:
-      0 2px 4px rgba(0, 0, 0, 0.35),
-      inset 0 1px 0 rgba(255, 255, 255, 0.07);
-    transition: transform 0.18s cubic-bezier(0.34, 1.2, 0.64, 1);
+      0 2px 5px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    transition: transform 0.22s cubic-bezier(0.34, 1.35, 0.64, 1);
     pointer-events: none;
   }
 
@@ -717,14 +717,18 @@
     font-size: 10px;
     font-family: inherit;
     font-weight: 800;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--text-dim);
-    padding: 3px 10px;
-    border-radius: 3px;
-    transition: color 0.15s;
-    text-shadow: var(--text-shadow);
+    padding: 4px 0;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
   }
 
   .tab-opt:hover {
@@ -737,7 +741,7 @@
   /* ── Content ── */
   .content {
     overflow: hidden;
-    padding: 10px 0;
+    padding: 6px 0;
     display: flex;
     flex-direction: column;
     min-height: 0;
