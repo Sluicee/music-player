@@ -17,12 +17,6 @@ impl FFmpegSource {
     pub fn new(app: &AppHandle, path: &str, seek_secs: f64) -> Result<Self, String> {
         let seek_str = format!("{:.3}", seek_secs);
 
-        // Use tauri-plugin-shell to get the sidecar command
-        let sidecar_command = app
-            .shell()
-            .sidecar("ffmpeg")
-            .map_err(|e| format!("Failed to create sidecar command: {}", e))?;
-
         // Configure arguments
         let sidecar_args = vec![
             "-f",
@@ -39,19 +33,40 @@ impl FFmpegSource {
             "-1",
         ];
 
-        // Special case for pre-warming the sidecar: just run -version and exit
-        let command;
-        if path == "prewarm" {
-            command = sidecar_command.arg("-version");
-        } else {
-            command = sidecar_command
-                .args(["-ss", &seek_str])
-                .args(["-i", path])
-                .args(sidecar_args)
-                .arg("pipe:1");
-        }
+        // 1. Try to find the organized production binary in bin/ffmpeg.exe
+        // 2. Fallback to standard sidecar (for Dev mode or standard installs)
+        use tauri::Manager;
+        let exe_dir = app.path().executable_dir().ok();
+        let bin_ffmpeg = exe_dir.as_ref().map(|d| d.join("bin").join("ffmpeg.exe"));
 
-        let mut std_command: Command = command.into();
+        let mut std_command: Command = if bin_ffmpeg.as_ref().map(|p| p.exists()).unwrap_or(false) {
+            let mut cmd = Command::new(bin_ffmpeg.unwrap());
+            if path == "prewarm" {
+                cmd.arg("-version");
+            } else {
+                cmd.args(["-ss", &seek_str])
+                    .args(["-i", path])
+                    .args(sidecar_args)
+                    .arg("pipe:1");
+            }
+            cmd
+        } else {
+            let sidecar_command = app
+                .shell()
+                .sidecar("ffmpeg")
+                .map_err(|e| format!("Failed to create sidecar command: {}", e))?;
+
+            let command = if path == "prewarm" {
+                sidecar_command.arg("-version")
+            } else {
+                sidecar_command
+                    .args(["-ss", &seek_str])
+                    .args(["-i", path])
+                    .args(sidecar_args)
+                    .arg("pipe:1")
+            };
+            command.into()
+        };
 
         let mut child = std_command
             .stdout(Stdio::piped())
