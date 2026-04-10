@@ -63,6 +63,7 @@ pub fn cover_filename(album_id: &str, mime: &str) -> String {
 
 struct TrackResult {
     track: Track,
+    explicit_album_artist: Option<String>,
     /// Raw cover bytes + MIME type from embedded tags, if present.
     cover: Option<(Vec<u8>, String)>,
 }
@@ -90,9 +91,8 @@ fn read_track_and_cover(path: &Path) -> Option<TrackResult> {
     let album = tag
         .and_then(|t| t.album().as_deref().map(String::from))
         .unwrap_or_else(|| "Unknown Album".to_string());
-    let album_artist = tag
-        .and_then(|t| t.get_string(&ItemKey::AlbumArtist).map(String::from))
-        .unwrap_or_else(|| artist.clone());
+    let explicit_album_artist = tag.and_then(|t| t.get_string(&ItemKey::AlbumArtist).map(String::from));
+    let album_artist = explicit_album_artist.clone().unwrap_or_else(|| artist.clone());
     let track_number = tag.and_then(|t| t.track()).unwrap_or(0);
     let disc_number = tag.and_then(|t| t.disk()).unwrap_or(1);
     let year = tag.and_then(|t| t.year());
@@ -125,6 +125,7 @@ fn read_track_and_cover(path: &Path) -> Option<TrackResult> {
             year,
             search_index,
         },
+        explicit_album_artist,
         cover,
     })
 }
@@ -241,6 +242,26 @@ fn strip_disc_suffix(album: &str) -> &str {
     trimmed
 }
 
+/// Helper to handle grouping paths logically (e.g. merging CD 1 and CD 2 folders)
+fn canonical_folder(path: &Path) -> String {
+    let mut parent = path.parent().unwrap_or(path);
+    if let Some(name) = parent.file_name().and_then(|n| n.to_str()) {
+        let lower = name.to_lowercase();
+        let is_cd = lower.starts_with("cd");
+        let is_disc = lower.starts_with("disc");
+        if is_cd || is_disc {
+            let prefix_len = if is_cd { 2 } else { 4 };
+            let rest = lower[prefix_len..].trim();
+            if rest.is_empty() || rest.chars().all(|c| c.is_ascii_digit()) {
+                if let Some(p) = parent.parent() {
+                    parent = p;
+                }
+            }
+        }
+    }
+    parent.to_string_lossy().replace('\\', "/")
+}
+
 /// Scan a folder and return all albums with embedded or folder-based cover art.
 /// Internet cover fetching is handled separately in lib.rs (async context).
 pub fn scan_folder(folder_path: &str, app: &tauri::AppHandle, covers_dir: &Path) -> Vec<Album> {
@@ -282,15 +303,17 @@ pub fn scan_folder(folder_path: &str, app: &tauri::AppHandle, covers_dir: &Path)
     let mut albums: HashMap<String, Album> = HashMap::new();
 
     for (result, audio_path) in results {
-        let TrackResult { track, cover } = result;
-        // Normalize key: strip feat./ft. from album artist, disc suffixes from album
-        // title, then lowercase — so "Artist feat. X" and "Album (Disc 2)" group
-        // with their respective main artist/album entries.
-        let album_key = format!(
-            "{}::{}",
-            strip_feat(track.album_artist.trim()).to_lowercase(),
-            strip_disc_suffix(track.album.trim()).to_lowercase()
-        );
+        let TrackResult { track, explicit_album_artist, cover } = result;
+        
+        let album_name_norm = strip_disc_suffix(track.album.trim()).to_lowercase();
+        let album_key = if album_name_norm.is_empty() || album_name_norm == "unknown album" {
+            format!("unknown::{}", strip_feat(track.artist.trim()).to_lowercase())
+        } else if let Some(eaa) = &explicit_album_artist {
+            format!("{}::{}", strip_feat(eaa.trim()).to_lowercase(), album_name_norm)
+        } else {
+            let folder = canonical_folder(&audio_path);
+            format!("{}::{}", folder.to_lowercase(), album_name_norm)
+        };
         let album = albums.entry(album_key.clone()).or_insert_with(|| Album {
             id: album_key,
             title: track.album.trim().to_string(),
@@ -330,10 +353,34 @@ pub fn scan_folder(folder_path: &str, app: &tauri::AppHandle, covers_dir: &Path)
         album.tracks.push(track);
     }
 
-    // Phase 4: sort
+    // Phase 4: sort and finalize compilation artists
     let mut album_list: Vec<Album> = albums.into_values().collect();
     for album in &mut album_list {
         album.tracks.sort_by_key(|t| (t.disc_number, t.track_number));
+
+        let mut unique_base_artists: Vec<String> = Vec::new();
+        let mut display_artists: Vec<String> = Vec::new();
+
+        for t in &album.tracks {
+            let base = strip_feat(t.album_artist.trim()).trim().to_string();
+            if !unique_base_artists.iter().any(|b| b.eq_ignore_ascii_case(&base)) {
+                unique_base_artists.push(base.clone());
+                display_artists.push(base);
+            }
+        }
+
+        if display_artists.len() == 1 {
+            album.artist = display_artists[0].clone();
+        } else {
+            album.artist = display_artists.join(", ");
+        }
+
+        // Automatically expand search index
+        album.search_index = format!(
+            "{} {}",
+            any_ascii(&album.title).to_lowercase(),
+            any_ascii(&album.artist).to_lowercase()
+        );
     }
     album_list.sort_by(|a, b| a.title.cmp(&b.title));
     album_list
