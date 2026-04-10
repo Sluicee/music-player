@@ -95,6 +95,30 @@
     { label: $t('switchLanguage'),                   action: () => { playUiSfx('confirm'); toggleLocale(); } },
   ]);
 
+  // Gamepad cursor
+  let gpIdx = $state(-1);
+
+  export function gamepadNavigate(dir: 'up' | 'down') {
+    const len = items.length;
+    if (len === 0) return;
+    if (gpIdx < 0) {
+      gpIdx = dir === 'up' ? len - 1 : 0;
+    } else if (dir === 'up') {
+      gpIdx = Math.max(0, gpIdx - 1);
+    } else {
+      gpIdx = Math.min(len - 1, gpIdx + 1);
+    }
+  }
+
+  export function gamepadConfirm() {
+    if (gpIdx < 0) return;
+    items[gpIdx]?.action();
+  }
+
+  export function gamepadClearCursor() {
+    gpIdx = -1;
+  }
+
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -103,10 +127,13 @@
   onmousedown={handleOverlayMouseDown}
 >
   <nav class="menu">
-    {#each items as item}
-      <button class="menu-item" class:highlight={item.highlight} onclick={item.action}>
-        {item.label}
-      </button>
+    {#each items as item, i}
+      <button
+        class="menu-item"
+        class:highlight={item.highlight}
+        class:gp-focused={i === gpIdx}
+        onclick={item.action}
+      >{item.label}</button>
     {/each}
   </nav>
 
@@ -164,7 +191,8 @@
     letter-spacing: 0.01em;
   }
 
-  .menu-item:hover {
+  .menu-item:hover,
+  .menu-item.gp-focused {
     color: var(--track-active);
   }
 

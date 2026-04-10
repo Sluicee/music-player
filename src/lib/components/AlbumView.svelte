@@ -129,6 +129,35 @@
   }
 
   let pickerTrack = $state<Track | null>(null);
+
+  // Gamepad track cursor (-1 = inactive)
+  let gpTrackIdx = $state(-1);
+  let tracklistEl = $state<HTMLUListElement | null>(null);
+
+  $effect(() => {
+    if (gpTrackIdx >= 0 && tracklistEl) {
+      const el = tracklistEl.querySelector<HTMLElement>(`[data-gp-idx="${gpTrackIdx}"]`);
+      el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  });
+
+  export function gamepadNavigate(dir: 'up' | 'down') {
+    const total = album.tracks.length;
+    if (total === 0) return;
+    if (gpTrackIdx < 0) {
+      gpTrackIdx = dir === 'up' ? total - 1 : 0;
+    } else if (dir === 'up') {
+      gpTrackIdx = Math.max(0, gpTrackIdx - 1);
+    } else {
+      gpTrackIdx = Math.min(total - 1, gpTrackIdx + 1);
+    }
+  }
+
+  export async function gamepadConfirm() {
+    if (gpTrackIdx < 0) return;
+    const track = album.tracks[gpTrackIdx];
+    if (track) await handleTrackClick(track);
+  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -154,14 +183,21 @@
         {#if album.year}<p class="album-year">{album.year}</p>{/if}
       </div>
 
-      <ul class="tracklist">
+      <ul class="tracklist" bind:this={tracklistEl}>
         {#each discGroups as group}
           {#if hasMultipleDiscs}
             <li class="disc-header">{$t('disc', group.disc)}</li>
           {/if}
           {#each group.tracks as track (track.id)}
             {@const active = $currentTrack?.id === track.id}
-            <li class="track" class:active>
+            {@const flatIdx = album.tracks.indexOf(track)}
+            <li
+              class="track"
+              class:active
+              class:gp-focused={flatIdx === gpTrackIdx}
+              data-gp-idx={flatIdx}
+              onmouseenter={() => { gpTrackIdx = -1; }}
+            >
               <button class="track-btn" onclick={() => handleTrackClick(track)}>
                 <span class="track-num">
                   {#if active && $isPlaying}
@@ -370,6 +406,10 @@
   .track.active .track-title,
   .track.active .track-num,
   .track.active .track-dur { color: var(--track-active); }
+
+  .track.gp-focused .track-title,
+  .track.gp-focused .track-num,
+  .track.gp-focused .track-dur { color: var(--track-hover); }
 
   .track-dur { font-size: 10px; color: var(--text-dim); flex-shrink: 0; transition: color 0.12s; }
 

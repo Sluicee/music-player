@@ -2,13 +2,16 @@
   import { convertFileSrc } from "@tauri-apps/api/core";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import AlbumGrid from "$lib/components/AlbumGrid.svelte";
+  import type AlbumGridType from "$lib/components/AlbumGrid.svelte";
   import AlbumView from "$lib/components/AlbumView.svelte";
+  import type AlbumViewType from "$lib/components/AlbumView.svelte";
   import PlaylistGrid from "$lib/components/PlaylistGrid.svelte";
   import PlaylistView from "$lib/components/PlaylistView.svelte";
   import VolumeControl from "$lib/components/VolumeControl.svelte";
   import ProgressBar from "$lib/components/ProgressBar.svelte";
   import PS2Btn from "$lib/components/PS2Btn.svelte";
   import OptionsMenu from "$lib/components/OptionsMenu.svelte";
+  import type OptionsMenuType from "$lib/components/OptionsMenu.svelte";
   import StatsView from "$lib/components/StatsView.svelte";
   import PlaylistPicker from "$lib/components/PlaylistPicker.svelte";
   import { playUiSfx, primeUiSfx } from "$lib/ui-sfx";
@@ -30,6 +33,7 @@
     resume,
     playNext,
     playPrev,
+    playShuffled,
     playShuffledAll,
     isShuffled,
     repeatMode,
@@ -41,6 +45,7 @@
   } from "$lib/stores/player";
   import { checkForUpdates } from "$lib/stores/updates";
   import { t } from "$lib/stores/i18n";
+  import { initGamepad, addGamepadListener, type GamepadAction } from "$lib/gamepad";
   import {
     currentTrack as ct,
     currentAlbum as ca,
@@ -63,6 +68,13 @@
   let searchQuery = $state("");
   let searchInput = $state<HTMLInputElement | null>(null);
   let followPlayback = $state(false);
+
+  // Component refs for gamepad cursor control
+  let albumGrid = $state<AlbumGridType | null>(null);
+  let albumView = $state<AlbumViewType | null>(null);
+  let optionsMenu = $state<OptionsMenuType | null>(null);
+  // Gamepad focus on the now-playing footer block
+  let gpNowPlayingFocused = $state(false);
 
   const filteredAlbums = $derived(
     searchOpen && searchQuery.trim()
@@ -209,7 +221,220 @@
     setTimeout(() => {
       getCurrentWindow().show();
     }, 35);
+
+    // Gamepad support
+    initGamepad();
+    addGamepadListener(handleGamepadAction);
   });
+
+  const VOL_STEP = 1 / 20;
+
+  function handleGamepadAction(action: GamepadAction) {
+    // Don't handle gamepad when typing
+    const tag = document.activeElement?.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+    // Route to options menu when open
+    if (optionsOpen) { handleGamepadOptions(action); return; }
+    if (statsOpen || npPickerOpen) return;
+
+    if ($selectedAlbum) {
+      handleGamepadAlbumView(action);
+    } else if (selectedPlaylist) {
+      handleGamepadPlaylistView(action);
+    } else {
+      handleGamepadGrid(action);
+    }
+  }
+
+  function handleGamepadOptions(action: GamepadAction) {
+    switch (action) {
+      case "circle":
+      case "l3":
+        optionsMenu?.gamepadClearCursor();
+        optionsOpen = false;
+        playUiSfx("back");
+        break;
+      case "cross":
+        optionsMenu?.gamepadConfirm();
+        break;
+      case "up":
+        optionsMenu?.gamepadNavigate("up");
+        break;
+      case "down":
+        optionsMenu?.gamepadNavigate("down");
+        break;
+    }
+  }
+
+  function handleGamepadGrid(action: GamepadAction) {
+    // When now-playing block is focused, reroute relevant actions
+    if (gpNowPlayingFocused) {
+      switch (action) {
+        case "cross":
+          gpNowPlayingFocused = false;
+          openCurrentContext();
+          return;
+        case "up":
+          gpNowPlayingFocused = false;
+          // Return cursor to bottom row of grid
+          albumGrid?.gamepadNavigate("up");
+          return;
+        case "circle":
+        case "down":
+        case "left":
+        case "right":
+          gpNowPlayingFocused = false;
+          return;
+        case "l3":
+          gpNowPlayingFocused = false;
+          openOptions();
+          return;
+        default:
+          break;
+      }
+    }
+
+    switch (action) {
+      case "cross":
+        albumGrid?.gamepadConfirm();
+        break;
+      case "circle":
+        toggleSearch();
+        break;
+      case "square":
+        handleShuffleAll();
+        break;
+      case "triangle":
+        playUiSfx("confirm");
+        toggleRepeat();
+        break;
+      case "l1":
+        if ($currentAlbum) handlePrev();
+        break;
+      case "r1":
+        if ($currentAlbum) handleNext();
+        break;
+      case "l2":
+        playUiSfx("steps");
+        setVolume(Math.max(0, $volume - VOL_STEP));
+        break;
+      case "r2":
+        playUiSfx("steps");
+        setVolume(Math.min(1, $volume + VOL_STEP));
+        break;
+      case "start":
+        if ($currentTrack) handleTransportPlayPause();
+        break;
+      case "select":
+        activeTab = activeTab === "library" ? "playlists" : "library";
+        playUiSfx("confirm");
+        albumGrid?.gamepadClearCursor();
+        gpNowPlayingFocused = false;
+        break;
+      case "l3":
+        openOptions();
+        break;
+      case "up":
+        if (activeTab === "library") albumGrid?.gamepadNavigate("up");
+        break;
+      case "down":
+        if (activeTab === "library") {
+          const hitBottom = albumGrid?.gamepadNavigate("down");
+          if (hitBottom) {
+            albumGrid?.gamepadClearCursor();
+            gpNowPlayingFocused = true;
+          }
+        }
+        break;
+      case "left":
+        if (activeTab === "library") albumGrid?.gamepadNavigate("left");
+        break;
+      case "right":
+        if (activeTab === "library") albumGrid?.gamepadNavigate("right");
+        break;
+    }
+  }
+
+  function handleGamepadAlbumView(action: GamepadAction) {
+    switch (action) {
+      case "circle":
+        selectedAlbum.set(null);
+        followPlayback = false;
+        playUiSfx("back");
+        break;
+      case "cross":
+        albumView?.gamepadConfirm();
+        break;
+      case "square":
+        if ($selectedAlbum) handleShuffle($selectedAlbum);
+        break;
+      case "triangle":
+        playUiSfx("confirm");
+        toggleRepeat();
+        break;
+      case "l1":
+        if ($currentAlbum) handlePrev();
+        break;
+      case "r1":
+        if ($currentAlbum) handleNext();
+        break;
+      case "l2":
+        playUiSfx("steps");
+        setVolume(Math.max(0, $volume - VOL_STEP));
+        break;
+      case "r2":
+        playUiSfx("steps");
+        setVolume(Math.min(1, $volume + VOL_STEP));
+        break;
+      case "start":
+        if ($currentTrack) handleTransportPlayPause();
+        break;
+      case "l3":
+        openOptions();
+        break;
+      case "up":
+        albumView?.gamepadNavigate("up");
+        break;
+      case "down":
+        albumView?.gamepadNavigate("down");
+        break;
+    }
+  }
+
+  function handleGamepadPlaylistView(action: GamepadAction) {
+    switch (action) {
+      case "circle":
+        selectedPlaylist = null;
+        playUiSfx("back");
+        break;
+      case "l1":
+        if ($currentAlbum) handlePrev();
+        break;
+      case "r1":
+        if ($currentAlbum) handleNext();
+        break;
+      case "l2":
+        playUiSfx("steps");
+        setVolume(Math.max(0, $volume - VOL_STEP));
+        break;
+      case "r2":
+        playUiSfx("steps");
+        setVolume(Math.min(1, $volume + VOL_STEP));
+        break;
+      case "start":
+        if ($currentTrack) handleTransportPlayPause();
+        break;
+      case "l3":
+        openOptions();
+        break;
+    }
+  }
+
+  async function handleShuffle(album: Album) {
+    playUiSfx("confirm");
+    await playShuffled(album);
+  }
 
   function selectAlbum(album: Album) {
     playUiSfx("confirm");
@@ -366,6 +591,7 @@
             </div>
           {:else}
             <AlbumGrid
+              bind:this={albumGrid}
               albums={filteredAlbums}
               onselect={selectAlbum}
               onhover={(a) => (hoveredAlbum = a)}
@@ -433,7 +659,7 @@
       <!-- Row 3: now-playing | volume | hints -->
       <div class="footer-bottom">
         <!-- Now playing -->
-        <div class="now-playing" class:active={!!$currentTrack}>
+        <div class="now-playing" class:active={!!$currentTrack} class:gp-focused={gpNowPlayingFocused}>
           <button
             class="now-playing-main"
             onclick={openCurrentContext}
@@ -507,6 +733,7 @@
             title="Options"
           >
             <span class="gear-icon">⚙</span>
+            <span class="options-gp-tag">L3</span>
           </button>
         </div>
       </div>
@@ -516,6 +743,7 @@
 
   {#if $selectedAlbum}
     <AlbumView
+      bind:this={albumView}
       album={$selectedAlbum}
       onclose={() => {
         selectedAlbum.set(null);
@@ -540,6 +768,7 @@
 
   {#if optionsOpen}
     <OptionsMenu
+      bind:this={optionsMenu}
       onclose={() => (optionsOpen = false)}
       onStats={() => (statsOpen = true)}
     />
@@ -849,6 +1078,10 @@
     transform: translateY(-1px);
   }
 
+  .now-playing.gp-focused {
+    box-shadow: 0 0 0 2px rgba(100, 140, 255, 0.7), var(--btn-shadow);
+  }
+
   .now-playing-main {
     display: flex;
     align-items: center;
@@ -1027,9 +1260,26 @@
       color 0.15s;
   }
 
+  .options-btn {
+    flex-direction: column;
+    gap: 2px;
+  }
+
   .options-btn:hover .gear-icon {
     opacity: 1;
     color: var(--text-primary);
+  }
+
+  .options-gp-tag {
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    line-height: 1;
+    text-shadow: none;
+  }
+
+  .options-btn:hover .options-gp-tag {
+    color: var(--text-secondary);
   }
 
   .action-hint {

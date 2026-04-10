@@ -6,10 +6,12 @@
     album,
     onclick,
     onhover,
+    focused = false,
   }: {
     album: Album;
     onclick: () => void;
     onhover: (album: Album | null) => void;
+    focused?: boolean;
   } = $props();
 
   const coverSrc = $derived(album.cover_art ? convertFileSrc(album.cover_art) : null);
@@ -17,6 +19,7 @@
 
 <button
   class="card"
+  class:gp-focused={focused}
   {onclick}
   onmouseenter={() => onhover(album)}
   onmouseleave={() => onhover(null)}
@@ -93,9 +96,17 @@
   }
 
   .card:hover .art::before,
-  .card:focus-visible .art::before {
+  .card:focus-visible .art::before,
+  .card.gp-focused .art::before {
     transform: translateX(115%);
     opacity: 1;
+  }
+
+  .card.gp-focused .art {
+    box-shadow:
+      0 0 0 2px rgba(100, 140, 255, 0.85),
+      3px 5px 14px rgba(0, 0, 0, 0.32);
+    filter: brightness(1.1) saturate(1.08);
   }
 
   .art img {
