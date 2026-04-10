@@ -1,6 +1,7 @@
 <script lang="ts">
   import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-  import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { getCurrentWindow, currentMonitor } from "@tauri-apps/api/window";
+  import { LogicalSize, LogicalPosition } from "@tauri-apps/api/dpi";
   import AlbumGrid from "$lib/components/AlbumGrid.svelte";
   import type AlbumGridType from "$lib/components/AlbumGrid.svelte";
   import AlbumView from "$lib/components/AlbumView.svelte";
@@ -14,6 +15,10 @@
   import type OptionsMenuType from "$lib/components/OptionsMenu.svelte";
   import StatsView from "$lib/components/StatsView.svelte";
   import PlaylistPicker from "$lib/components/PlaylistPicker.svelte";
+  import ViewModeBar from "$lib/components/ViewModeBar.svelte";
+  import FocusView from "$lib/components/FocusView.svelte";
+  import MiniPlayer from "$lib/components/MiniPlayer.svelte";
+  import { viewMode } from "$lib/stores/viewMode";
   import { playUiSfx, primeUiSfx } from "$lib/ui-sfx";
   import { onMount } from "svelte";
   import {
@@ -45,7 +50,11 @@
   } from "$lib/stores/player";
   import { checkForUpdates } from "$lib/stores/updates";
   import { t } from "$lib/stores/i18n";
-  import { initGamepad, addGamepadListener, type GamepadAction } from "$lib/gamepad";
+  import {
+    initGamepad,
+    addGamepadListener,
+    type GamepadAction,
+  } from "$lib/gamepad";
   import {
     currentTrack as ct,
     currentAlbum as ca,
@@ -165,7 +174,10 @@
         playUiSfx("steps");
         break;
       case "Escape":
-        if (optionsOpen) {
+        if ($viewMode !== "normal") {
+          playUiSfx("back");
+          viewMode.set("normal");
+        } else if (optionsOpen) {
           optionsOpen = false;
         } else if (statsOpen) {
           statsOpen = false;
@@ -193,12 +205,63 @@
     }
   }
 
+  // Resize/reposition window when view mode changes
+  $effect(() => {
+    const mode = $viewMode;
+    const win = getCurrentWindow();
+    (async () => {
+      switch (mode) {
+        case "normal":
+        case "focus": {
+          await win.setFullscreen(false);
+          await win.setAlwaysOnTop(false);
+          const targetW = 950;
+          const targetH = 900;
+          await win.setSize(new LogicalSize(targetW, targetH));
+          // After resize, clamp position so window stays fully on-screen
+          try {
+            const monitor = await currentMonitor();
+            if (monitor) {
+              const sf = monitor.scaleFactor;
+              // monitor.position and size are in physical pixels
+              const monX = monitor.position.x / sf;
+              const monY = monitor.position.y / sf;
+              const monW = monitor.size.width / sf;
+              const monH = monitor.size.height / sf;
+              const pos = await win.outerPosition();
+              const curX = pos.x / sf;
+              const curY = pos.y / sf;
+              const clampedX = Math.max(monX, Math.min(curX, monX + monW - targetW));
+              const clampedY = Math.max(monY, Math.min(curY, monY + monH - targetH));
+              if (clampedX !== curX || clampedY !== curY) {
+                await win.setPosition(new LogicalPosition(clampedX, clampedY));
+              }
+            }
+          } catch { /* ignore position errors */ }
+          break;
+        }
+        case "fullscreen":
+          await win.setAlwaysOnTop(false);
+          await win.setFullscreen(true);
+          break;
+        case "mini":
+          await win.setFullscreen(false);
+          await win.setAlwaysOnTop(false);
+          await win.setSize(new LogicalSize(400, 160));
+          break;
+      }
+    })();
+  });
+
   onMount(async () => {
     primeUiSfx();
 
     // Sync Discord RPC setting to backend
-    const discordRpcEnabled = localStorage.getItem('mc_discord_rpc_enabled') !== 'false';
-    invoke('set_discord_rpc_enabled', { enabled: discordRpcEnabled }).catch(() => {});
+    const discordRpcEnabled =
+      localStorage.getItem("mc_discord_rpc_enabled") !== "false";
+    invoke("set_discord_rpc_enabled", { enabled: discordRpcEnabled }).catch(
+      () => {},
+    );
 
     // Restore volume to audio backend
     await initVolume();
@@ -239,7 +302,10 @@
     if (tag === "INPUT" || tag === "TEXTAREA") return;
 
     // Route to options menu when open
-    if (optionsOpen) { handleGamepadOptions(action); return; }
+    if (optionsOpen) {
+      handleGamepadOptions(action);
+      return;
+    }
     if (statsOpen || npPickerOpen) return;
 
     if ($selectedAlbum) {
@@ -508,284 +574,313 @@
 
 <svelte:window onkeydown={handleGlobalKeydown} />
 
-<div class="root">
-  <div class="shell">
-    <!-- Header -->
-    <header class="header">
-      <div class="header-left">
-        <div class="mc-card"></div>
-        <div class="memory-block">
-          <span class="memory-label">{$t('memoryCard')}</span>
-          {#if $librarySize !== "0 MB"}
-            <span class="lib-size">{$librarySize}</span>
+<div class="root" class:mode-mini={$viewMode === "mini"}>
+  <ViewModeBar />
+
+  {#if $viewMode === "mini"}
+    <MiniPlayer />
+  {:else}
+    <div class="shell">
+      <!-- Header -->
+      <header class="header">
+        <div class="header-left">
+          <div class="mc-card"></div>
+          <div class="memory-block">
+            <span class="memory-label">{$t("memoryCard")}</span>
+            {#if $librarySize !== "0 MB"}
+              <span class="lib-size">{$librarySize}</span>
+            {/if}
+          </div>
+        </div>
+
+        <div class="header-right">
+          {#if searchOpen && activeTab === "library"}
+            <input
+              bind:this={searchInput}
+              bind:value={searchQuery}
+              onkeydown={onSearchKey}
+              class="search-input"
+              placeholder={$t("searchPlaceholder")}
+              autocomplete="off"
+              spellcheck="false"
+            />
+          {:else if $isScanning}
+            <span class="scanning">{$t("scanning")}</span>
+          {/if}
+          {#if activeTab === "library" && hoveredAlbum}
+            <span class="hovered-title" class:hovered-title--small={searchOpen}
+              >{hoveredAlbum.title}</span
+            >
+          {:else if activeTab === "playlists" && hoveredPlaylist}
+            <span class="hovered-title">{hoveredPlaylist.name}</span>
           {/if}
         </div>
+      </header>
+
+      <!-- Tab switcher -->
+      <div class="tab-toggle">
+        <div
+          class="tab-thumb"
+          class:tab-thumb--right={activeTab === "playlists"}
+        ></div>
+        <button
+          class="tab-opt"
+          class:tab-opt--active={activeTab === "library"}
+          onclick={() => {
+            activeTab = "library";
+            playUiSfx("back");
+          }}>{$t("library")}</button
+        >
+        <button
+          class="tab-opt"
+          class:tab-opt--active={activeTab === "playlists"}
+          onclick={() => {
+            activeTab = "playlists";
+            playUiSfx("confirm");
+          }}>{$t("playlists")}</button
+        >
       </div>
 
-      <div class="header-right">
-        {#if searchOpen && activeTab === "library"}
-          <input
-            bind:this={searchInput}
-            bind:value={searchQuery}
-            onkeydown={onSearchKey}
-            class="search-input"
-            placeholder={$t('searchPlaceholder')}
-            autocomplete="off"
-            spellcheck="false"
-          />
-        {:else if $isScanning}
-          <span class="scanning">{$t('scanning')}</span>
-        {/if}
-        {#if activeTab === "library" && hoveredAlbum}
-          <span class="hovered-title" class:hovered-title--small={searchOpen}
-            >{hoveredAlbum.title}</span
-          >
-        {:else if activeTab === "playlists" && hoveredPlaylist}
-          <span class="hovered-title">{hoveredPlaylist.name}</span>
-        {/if}
-      </div>
-    </header>
-
-    <!-- Tab switcher -->
-    <div class="tab-toggle">
-      <div
-        class="tab-thumb"
-        class:tab-thumb--right={activeTab === "playlists"}
-      ></div>
-      <button
-        class="tab-opt"
-        class:tab-opt--active={activeTab === "library"}
-        onclick={() => {
-          activeTab = "library";
-          playUiSfx("back");
-        }}>{$t('library')}</button>
-      <button
-        class="tab-opt"
-        class:tab-opt--active={activeTab === "playlists"}
-        onclick={() => {
-          activeTab = "playlists";
-          playUiSfx("confirm");
-        }}>{$t('playlists')}</button>
-    </div>
-
-    <!-- Content -->
-    <main class="content">
-      {#if activeTab === "library"}
-        {#if $isScanning && $albums.length === 0}
-          <div class="state-msg">
-            <div class="spinner"></div>
-            <p class="scan-info">
-              {#if $scanStatus.filesScanned > 0}
-                {$t('scanFiles', $scanStatus.filesScanned, $scanStatus.albumsFound)}
-              {:else}
-                {$t('startingScan')}
-              {/if}
-            </p>
-          </div>
-        {:else if $albums.length === 0}
-          <div class="state-msg">
-            <p class="hint">
-              {$t('selectHint')} <strong>{$t('optionsWord')}</strong> {$t('selectHintSuffix')}
-            </p>
-          </div>
-        {:else}
-          {#if $isScanning}
-            <div class="scan-bar">
-              <div class="spinner-sm"></div>
-              <span>{$t('scanFilesFound', $scanStatus.filesScanned, $scanStatus.albumsFound)}</span>
-            </div>
-          {/if}
-          {#if searchOpen && searchQuery && filteredAlbums.length === 0}
+      <!-- Content -->
+      <main class="content">
+        {#if activeTab === "library"}
+          {#if $isScanning && $albums.length === 0}
             <div class="state-msg">
-              <p class="hint">{$t('noResultsFor')} <strong>{searchQuery}</strong></p>
+              <div class="spinner"></div>
+              <p class="scan-info">
+                {#if $scanStatus.filesScanned > 0}
+                  {$t(
+                    "scanFiles",
+                    $scanStatus.filesScanned,
+                    $scanStatus.albumsFound,
+                  )}
+                {:else}
+                  {$t("startingScan")}
+                {/if}
+              </p>
+            </div>
+          {:else if $albums.length === 0}
+            <div class="state-msg">
+              <p class="hint">
+                {$t("selectHint")} <strong>{$t("optionsWord")}</strong>
+                {$t("selectHintSuffix")}
+              </p>
             </div>
           {:else}
-            <AlbumGrid
-              bind:this={albumGrid}
-              albums={filteredAlbums}
-              onselect={selectAlbum}
-              onhover={(a) => (hoveredAlbum = a)}
-              initialPage={initialAlbumPage}
-            />
+            {#if $isScanning}
+              <div class="scan-bar">
+                <div class="spinner-sm"></div>
+                <span
+                  >{$t(
+                    "scanFilesFound",
+                    $scanStatus.filesScanned,
+                    $scanStatus.albumsFound,
+                  )}</span
+                >
+              </div>
+            {/if}
+            {#if searchOpen && searchQuery && filteredAlbums.length === 0}
+              <div class="state-msg">
+                <p class="hint">
+                  {$t("noResultsFor")} <strong>{searchQuery}</strong>
+                </p>
+              </div>
+            {:else}
+              <AlbumGrid
+                bind:this={albumGrid}
+                albums={filteredAlbums}
+                onselect={selectAlbum}
+                onhover={(a) => (hoveredAlbum = a)}
+                initialPage={initialAlbumPage}
+              />
+            {/if}
           {/if}
-        {/if}
-      {:else}
-        <PlaylistGrid
-          playlists={$playlists}
-          onselect={(pl) => {
-            playUiSfx("confirm");
-            selectedPlaylist = pl;
-          }}
-          onhover={(pl) => (hoveredPlaylist = pl)}
-        />
-      {/if}
-    </main>
-
-    <!-- Footer -->
-    <footer class="footer">
-      <!-- Row 1: progress -->
-      <div class="footer-progress">
-        <ProgressBar />
-      </div>
-
-      <!-- Row 2: transport + volume -->
-      <div class="footer-top">
-        <div class="transport">
-          <button
-            class="transport-btn transport-btn--shoulder"
-            onclick={handlePrev}
-            disabled={!$currentTrack}
-            title="Previous"
-          >
-            <span class="transport-tag">L1</span>
-            <span class="transport-icon">&lt;&lt;</span>
-            <span class="transport-text">{$t('prev')}</span>
-          </button>
-          <button
-            class="transport-btn play-btn"
-            onclick={handleTransportPlayPause}
-            disabled={!$currentTrack}
-            title={$isPlaying ? "Pause" : "Play"}
-          >
-            <PS2Btn type="start" />
-            <span class="transport-text play-pause-text"
-              >{$isPlaying ? $t('pause') : $t('play')}</span
-            >
-          </button>
-          <button
-            class="transport-btn transport-btn--shoulder"
-            onclick={handleNext}
-            disabled={!$currentTrack}
-            title="Next"
-          >
-            <span class="transport-tag">R1</span>
-            <span class="transport-icon">&gt;&gt;</span>
-            <span class="transport-text">{$t('next')}</span>
-          </button>
-        </div>
-        <VolumeControl />
-      </div>
-
-      <!-- Row 3: now-playing | volume | hints -->
-      <div class="footer-bottom">
-        <!-- Now playing -->
-        <div class="now-playing" class:active={!!$currentTrack} class:gp-focused={gpNowPlayingFocused}>
-          <button
-            class="now-playing-main"
-            onclick={openCurrentContext}
-            disabled={!$currentTrack}
-          >
-            <div class="now-playing-art">
-              {#if $currentAlbum?.cover_art}
-                <img src={convertFileSrc($currentAlbum.cover_art)} alt="" />
-              {:else}
-                <span>♪</span>
-              {/if}
-            </div>
-            <div class="now-playing-info">
-              <span class="track-name"
-                >{$currentTrack?.title ?? $t('noTrackPlaying')}</span
-              >
-              <span class="track-artist">{$currentTrack?.artist ?? "—"}</span>
-            </div>
-          </button>
-          {#if $currentTrack}
-            <button
-              class="np-add-btn"
-              onclick={() => {
-                playUiSfx("open");
-                npPickerOpen = true;
-              }}
-              title="Add to playlist">+</button
-            >
-          {/if}
-        </div>
-
-        <!-- PS2 action hints -->
-        <div class="actions">
-          <div class="action-hint">
-            <PS2Btn type="cross" />
-            <span class="btn-label">{$t('select')}</span>
-          </div>
-          <button class="action-hint action-btn" onclick={toggleSearch}>
-            <PS2Btn type="circle" />
-            <span class="btn-label" class:active-search={searchOpen}
-              >{$t('search')}</span
-            >
-          </button>
-          <button class="action-hint action-btn" onclick={handleShuffleAll}>
-            <PS2Btn type="square" />
-            <span class="btn-label" class:active-shuffle={$isShuffled}
-              >{$t('shuffle')}</span
-            >
-          </button>
-          <button
-            class="action-hint action-btn"
-            onclick={() => {
+        {:else}
+          <PlaylistGrid
+            playlists={$playlists}
+            onselect={(pl) => {
               playUiSfx("confirm");
-              toggleRepeat();
+              selectedPlaylist = pl;
             }}
-          >
-            <PS2Btn type="triangle" />
-            <span
-              class="btn-label repeat-label"
-              class:active-repeat={$repeatMode !== "none"}
-              >{$repeatMode === "one"
-                ? $t('repeatOne')
-                : $repeatMode === "all"
-                  ? $t('repeatAll')
-                  : $t('repeat')}</span
-            >
-          </button>
-          <button
-            class="action-hint action-btn options-btn"
-            onclick={openOptions}
-            title="Options"
-          >
-            <span class="gear-icon">⚙</span>
-            <span class="options-gp-tag">L3</span>
-          </button>
+            onhover={(pl) => (hoveredPlaylist = pl)}
+          />
+        {/if}
+      </main>
+
+      <!-- Footer -->
+      <footer class="footer">
+        <!-- Row 1: progress -->
+        <div class="footer-progress">
+          <ProgressBar />
         </div>
-      </div>
-      <!-- /footer-bottom -->
-    </footer>
-  </div>
 
-  {#if $selectedAlbum}
-    <AlbumView
-      bind:this={albumView}
-      album={$selectedAlbum}
-      onclose={() => {
-        selectedAlbum.set(null);
-        followPlayback = false;
-      }}
-    />
-  {/if}
+        <!-- Row 2: transport + volume -->
+        <div class="footer-top">
+          <div class="transport">
+            <button
+              class="transport-btn transport-btn--shoulder"
+              onclick={handlePrev}
+              disabled={!$currentTrack}
+              title="Previous"
+            >
+              <span class="transport-tag">L1</span>
+              <span class="transport-icon">&lt;&lt;</span>
+              <span class="transport-text">{$t("prev")}</span>
+            </button>
+            <button
+              class="transport-btn play-btn"
+              onclick={handleTransportPlayPause}
+              disabled={!$currentTrack}
+              title={$isPlaying ? "Pause" : "Play"}
+            >
+              <PS2Btn type="start" />
+              <span class="transport-text play-pause-text"
+                >{$isPlaying ? $t("pause") : $t("play")}</span
+              >
+            </button>
+            <button
+              class="transport-btn transport-btn--shoulder"
+              onclick={handleNext}
+              disabled={!$currentTrack}
+              title="Next"
+            >
+              <span class="transport-tag">R1</span>
+              <span class="transport-icon">&gt;&gt;</span>
+              <span class="transport-text">{$t("next")}</span>
+            </button>
+          </div>
+          <VolumeControl />
+        </div>
 
-  {#if selectedPlaylist}
-    <PlaylistView
-      playlist={selectedPlaylist}
-      onclose={() => (selectedPlaylist = null)}
-    />
-  {/if}
+        <!-- Row 3: now-playing | volume | hints -->
+        <div class="footer-bottom">
+          <!-- Now playing -->
+          <div
+            class="now-playing"
+            class:active={!!$currentTrack}
+            class:gp-focused={gpNowPlayingFocused}
+          >
+            <button
+              class="now-playing-main"
+              onclick={openCurrentContext}
+              disabled={!$currentTrack}
+            >
+              <div class="now-playing-art">
+                {#if $currentAlbum?.cover_art}
+                  <img src={convertFileSrc($currentAlbum.cover_art)} alt="" />
+                {:else}
+                  <span>♪</span>
+                {/if}
+              </div>
+              <div class="now-playing-info">
+                <span class="track-name"
+                  >{$currentTrack?.title ?? $t("noTrackPlaying")}</span
+                >
+                <span class="track-artist">{$currentTrack?.artist ?? "—"}</span>
+              </div>
+            </button>
+            {#if $currentTrack}
+              <button
+                class="np-add-btn"
+                onclick={() => {
+                  playUiSfx("open");
+                  npPickerOpen = true;
+                }}
+                title="Add to playlist">+</button
+              >
+            {/if}
+          </div>
 
-  {#if npPickerOpen && $currentTrack}
-    <PlaylistPicker
-      track={$currentTrack}
-      onclose={() => (npPickerOpen = false)}
-    />
-  {/if}
+          <!-- PS2 action hints -->
+          <div class="actions">
+            <div class="action-hint">
+              <PS2Btn type="cross" />
+              <span class="btn-label">{$t("select")}</span>
+            </div>
+            <button class="action-hint action-btn" onclick={toggleSearch}>
+              <PS2Btn type="circle" />
+              <span class="btn-label" class:active-search={searchOpen}
+                >{$t("search")}</span
+              >
+            </button>
+            <button class="action-hint action-btn" onclick={handleShuffleAll}>
+              <PS2Btn type="square" />
+              <span class="btn-label" class:active-shuffle={$isShuffled}
+                >{$t("shuffle")}</span
+              >
+            </button>
+            <button
+              class="action-hint action-btn"
+              onclick={() => {
+                playUiSfx("confirm");
+                toggleRepeat();
+              }}
+            >
+              <PS2Btn type="triangle" />
+              <span
+                class="btn-label repeat-label"
+                class:active-repeat={$repeatMode !== "none"}
+                >{$repeatMode === "one"
+                  ? $t("repeatOne")
+                  : $repeatMode === "all"
+                    ? $t("repeatAll")
+                    : $t("repeat")}</span
+              >
+            </button>
+            <button
+              class="action-hint action-btn options-btn"
+              onclick={openOptions}
+              title="Options"
+            >
+              <span class="gear-icon">⚙</span>
+              <span class="options-gp-tag">L3</span>
+            </button>
+          </div>
+        </div>
+        <!-- /footer-bottom -->
+      </footer>
+    </div>
 
-  {#if optionsOpen}
-    <OptionsMenu
-      bind:this={optionsMenu}
-      onclose={() => (optionsOpen = false)}
-      onStats={() => (statsOpen = true)}
-    />
-  {/if}
+    {#if $selectedAlbum}
+      <AlbumView
+        bind:this={albumView}
+        album={$selectedAlbum}
+        onclose={() => {
+          selectedAlbum.set(null);
+          followPlayback = false;
+        }}
+      />
+    {/if}
 
-  {#if statsOpen}
-    <StatsView albums={$albums} onclose={() => (statsOpen = false)} />
+    {#if selectedPlaylist}
+      <PlaylistView
+        playlist={selectedPlaylist}
+        onclose={() => (selectedPlaylist = null)}
+      />
+    {/if}
+
+    {#if npPickerOpen && $currentTrack}
+      <PlaylistPicker
+        track={$currentTrack}
+        onclose={() => (npPickerOpen = false)}
+      />
+    {/if}
+
+    {#if optionsOpen}
+      <OptionsMenu
+        bind:this={optionsMenu}
+        onclose={() => (optionsOpen = false)}
+        onStats={() => (statsOpen = true)}
+      />
+    {/if}
+
+    {#if statsOpen}
+      <StatsView albums={$albums} onclose={() => (statsOpen = false)} />
+    {/if}
+
+    {#if $viewMode === "focus" || $viewMode === "fullscreen"}
+      <FocusView />
+    {/if}
   {/if}
 </div>
 
@@ -801,6 +896,11 @@
     overflow: hidden;
     filter: saturate(0.82) contrast(1.08) brightness(0.97) blur(0.4px);
     image-rendering: crisp-edges;
+  }
+
+  .root.mode-mini {
+    background: transparent;
+    filter: none;
   }
 
   .shell {
@@ -960,7 +1060,7 @@
     padding: 4px 0;
     border-radius: 4px;
     transition: all 0.2s ease;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
     white-space: nowrap;
     display: flex;
     align-items: center;
@@ -1089,7 +1189,9 @@
   }
 
   .now-playing.gp-focused {
-    box-shadow: 0 0 0 2px rgba(100, 140, 255, 0.7), var(--btn-shadow);
+    box-shadow:
+      0 0 0 2px rgba(100, 140, 255, 0.7),
+      var(--btn-shadow);
   }
 
   .now-playing-main {
