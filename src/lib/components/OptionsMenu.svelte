@@ -4,6 +4,7 @@
   import { updateInfo } from '../stores/updates';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
+  import { getVersion } from '@tauri-apps/api/app';
   import PS2Btn from './PS2Btn.svelte';
   import { playUiSfx, sfxEnabled } from '$lib/ui-sfx';
   import { t, toggleLocale } from '$lib/stores/i18n';
@@ -22,8 +23,15 @@
   let { onclose, onStats }: { onclose: () => void; onStats: () => void } = $props();
   let autostartEnabled = $state(false);
   let discordRpcEnabled = $state(loadDiscordRpcEnabled());
+  let appVersion = $state('');
 
   onMount(async () => {
+    try {
+      appVersion = await getVersion();
+    } catch (e) {
+      console.error('Failed to get app version:', e);
+    }
+    
     try {
       autostartEnabled = await isEnabled();
     } catch (e) {
@@ -233,6 +241,10 @@
       <span>{$t('close')}</span>
     </button>
   </div>
+
+  {#if appVersion}
+    <div class="app-version">v{appVersion}</div>
+  {/if}
 </div>
 
 <style>
@@ -335,4 +347,13 @@
   }
 
   .hint-btn:hover { color: var(--track-hover); }
+
+  .app-version {
+    position: absolute;
+    bottom: 24px;
+    right: 32px;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
 </style>
