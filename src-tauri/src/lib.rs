@@ -282,6 +282,14 @@ fn update_media_playback_state(
     media_controls.inner().update_playback(is_playing, position_ms);
 }
 
+#[tauri::command]
+fn set_discord_rpc_enabled(
+    enabled: bool,
+    media_controls: State<'_, MediaControlsManager>,
+) {
+    media_controls.inner().set_discord_enabled(enabled);
+}
+
 // ── Update Commands ──────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -370,6 +378,7 @@ pub fn run() {
             load_library_cache,
             update_media_metadata,
             update_media_playback_state,
+            set_discord_rpc_enabled,
             check_for_updates,
         ])
         .run(tauri::generate_context!())

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { convertFileSrc } from "@tauri-apps/api/core";
+  import { convertFileSrc, invoke } from "@tauri-apps/api/core";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import AlbumGrid from "$lib/components/AlbumGrid.svelte";
   import type AlbumGridType from "$lib/components/AlbumGrid.svelte";
@@ -196,6 +196,10 @@
   onMount(async () => {
     primeUiSfx();
 
+    // Sync Discord RPC setting to backend
+    const discordRpcEnabled = localStorage.getItem('mc_discord_rpc_enabled') !== 'false';
+    invoke('set_discord_rpc_enabled', { enabled: discordRpcEnabled }).catch(() => {});
+
     // Restore volume to audio backend
     await initVolume();
 
@@ -263,6 +267,12 @@
         break;
       case "down":
         optionsMenu?.gamepadNavigate("down");
+        break;
+      case "left":
+        optionsMenu?.gamepadNavigate("left");
+        break;
+      case "right":
+        optionsMenu?.gamepadNavigate("right");
         break;
     }
   }

@@ -1,6 +1,7 @@
 use crate::discord_rpc::DiscordManager;
 use souvlaki::{MediaControls, MediaPlayback, MediaPosition, PlatformConfig};
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -29,6 +30,7 @@ pub struct MediaControlsManager {
     controls: Arc<Mutex<Option<MediaControls>>>,
     hwnd: isize,
     discord: DiscordManager,
+    discord_enabled: Arc<AtomicBool>,
     current_metadata: Arc<Mutex<TrackMetadata>>,
     current_playback: Arc<Mutex<(bool, u64)>>, // (is_playing, position_ms)
 }
@@ -56,6 +58,7 @@ impl MediaControlsManager {
             controls: Arc::new(Mutex::new(None)),
             hwnd: hwnd_val,
             discord: DiscordManager::new(),
+            discord_enabled: Arc::new(AtomicBool::new(true)),
             current_metadata: Arc::new(Mutex::new(TrackMetadata::default())),
             current_playback: Arc::new(Mutex::new((false, 0))),
         };
@@ -167,6 +170,10 @@ impl MediaControlsManager {
     }
 
     fn update_discord(&self) {
+        if !self.discord_enabled.load(Ordering::Relaxed) {
+            return;
+        }
+
         let meta = self.current_metadata.lock().unwrap();
         let (is_playing, position_ms) = *self.current_playback.lock().unwrap();
 
@@ -181,6 +188,15 @@ impl MediaControlsManager {
             position_ms,
             meta.duration_ms,
         );
+    }
+
+    pub fn set_discord_enabled(&self, enabled: bool) {
+        self.discord_enabled.store(enabled, Ordering::Relaxed);
+        if !enabled {
+            self.discord.clear();
+        } else {
+            self.update_discord();
+        }
     }
 }
 

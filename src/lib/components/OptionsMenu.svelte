@@ -9,8 +9,19 @@
   import { t, toggleLocale } from '$lib/stores/i18n';
   import { onMount } from 'svelte';
 
+  const DISCORD_RPC_KEY = 'mc_discord_rpc_enabled';
+
+  function loadDiscordRpcEnabled(): boolean {
+    try {
+      const stored = localStorage.getItem(DISCORD_RPC_KEY);
+      if (stored !== null) return stored === 'true';
+    } catch {}
+    return true;
+  }
+
   let { onclose, onStats }: { onclose: () => void; onStats: () => void } = $props();
   let autostartEnabled = $state(false);
+  let discordRpcEnabled = $state(loadDiscordRpcEnabled());
 
   onMount(async () => {
     try {
@@ -18,7 +29,24 @@
     } catch (e) {
       console.error('Failed to check autostart status:', e);
     }
+    // Sync Discord RPC state to backend on open
+    try {
+      await invoke('set_discord_rpc_enabled', { enabled: discordRpcEnabled });
+    } catch (e) {
+      console.error('Failed to sync Discord RPC state:', e);
+    }
   });
+
+  async function toggleDiscordRpc() {
+    playUiSfx('confirm');
+    discordRpcEnabled = !discordRpcEnabled;
+    try {
+      localStorage.setItem(DISCORD_RPC_KEY, discordRpcEnabled.toString());
+      await invoke('set_discord_rpc_enabled', { enabled: discordRpcEnabled });
+    } catch (e) {
+      console.error('Failed to toggle Discord RPC:', e);
+    }
+  }
 
   async function toggleAutostart() {
     playUiSfx('confirm');
@@ -84,35 +112,74 @@
     }
   }
 
-  const items = $derived([
-    ...($updateInfo ? [{ label: $t('getUpdate', $updateInfo.version), action: getUpdate, highlight: true }] : []),
-    { label: $t('addFolder'),                        action: addFolder       },
-    { label: $t('refreshLibrary'),                   action: refresh         },
-    { label: $t('statistics'),                       action: openStats       },
-    { label: $t('sfx', $sfxEnabled),                 action: toggleSfx       },
-    { label: $t('autostart', autostartEnabled),      action: toggleAutostart },
-    { label: $t('clearLibrary'),                     action: clear           },
-    { label: $t('switchLanguage'),                   action: () => { playUiSfx('confirm'); toggleLocale(); } },
+  // updateItem отдельно, чтобы не путать с колонками
+  const updateItem = $derived(
+    $updateInfo ? { label: $t('getUpdate', $updateInfo.version), action: getUpdate } : null
+  );
+
+  const leftItems = $derived([
+    { label: $t('addFolder'),     action: addFolder  },
+    { label: $t('refreshLibrary'), action: refresh   },
+    { label: $t('statistics'),    action: openStats  },
+    { label: $t('clearLibrary'),  action: clear      },
   ]);
 
-  // Gamepad cursor
+  const rightItems = $derived([
+    { label: $t('sfx', $sfxEnabled),              action: toggleSfx       },
+    { label: $t('autostart', autostartEnabled),   action: toggleAutostart },
+    { label: $t('discordRpc', discordRpcEnabled), action: toggleDiscordRpc },
+    { label: $t('switchLanguage'),                action: () => { playUiSfx('confirm'); toggleLocale(); } },
+  ]);
+
+  // Gamepad cursor: -1 = none, 0 = updateItem, 1..L = left col, L+1..L+R = right col
   let gpIdx = $state(-1);
 
-  export function gamepadNavigate(dir: 'up' | 'down') {
-    const len = items.length;
-    if (len === 0) return;
+  const LEFT_COUNT = 4;
+
+  function getUpdateOffset() { return updateItem ? 1 : 0; }
+
+  export function gamepadNavigate(dir: 'up' | 'down' | 'left' | 'right') {
+    const U = getUpdateOffset();
+    const total = U + leftItems.length + rightItems.length;
+    if (total === 0) return;
+
     if (gpIdx < 0) {
-      gpIdx = dir === 'up' ? len - 1 : 0;
-    } else if (dir === 'up') {
-      gpIdx = Math.max(0, gpIdx - 1);
-    } else {
-      gpIdx = Math.min(len - 1, gpIdx + 1);
+      gpIdx = dir === 'up' ? total - 1 : U;
+      return;
+    }
+
+    // На update-кнопке
+    if (gpIdx < U) {
+      if (dir === 'down') gpIdx = U;
+      return;
+    }
+
+    const inRight = gpIdx >= U + LEFT_COUNT;
+    const colStart = inRight ? U + LEFT_COUNT : U;
+    const colLen   = inRight ? rightItems.length : leftItems.length;
+    const row      = gpIdx - colStart;
+
+    if (dir === 'up') {
+      if (row === 0) { if (updateItem) gpIdx = 0; return; }
+      gpIdx = colStart + row - 1;
+    } else if (dir === 'down') {
+      if (row >= colLen - 1) return;
+      gpIdx = colStart + row + 1;
+    } else if (dir === 'left') {
+      if (!inRight) return;
+      gpIdx = U + Math.min(row, leftItems.length - 1);
+    } else if (dir === 'right') {
+      if (inRight) return;
+      gpIdx = U + LEFT_COUNT + Math.min(row, rightItems.length - 1);
     }
   }
 
   export function gamepadConfirm() {
     if (gpIdx < 0) return;
-    items[gpIdx]?.action();
+    const U = getUpdateOffset();
+    if (gpIdx < U) { updateItem?.action(); return; }
+    if (gpIdx < U + LEFT_COUNT) { leftItems[gpIdx - U]?.action(); return; }
+    rightItems[gpIdx - U - LEFT_COUNT]?.action();
   }
 
   export function gamepadClearCursor() {
@@ -127,14 +194,37 @@
   onmousedown={handleOverlayMouseDown}
 >
   <nav class="menu">
-    {#each items as item, i}
+    {#if updateItem}
       <button
-        class="menu-item"
-        class:highlight={item.highlight}
-        class:gp-focused={i === gpIdx}
-        onclick={item.action}
-      >{item.label}</button>
-    {/each}
+        class="menu-item full-width highlight"
+        class:gp-focused={gpIdx === 0}
+        onclick={updateItem.action}
+      >{updateItem.label}</button>
+    {/if}
+
+    <div class="columns">
+      <div class="col">
+        {#each leftItems as item, i}
+          {@const flatIdx = getUpdateOffset() + i}
+          <button
+            class="menu-item"
+            class:gp-focused={flatIdx === gpIdx}
+            onclick={item.action}
+          >{item.label}</button>
+        {/each}
+      </div>
+
+      <div class="col">
+        {#each rightItems as item, i}
+          {@const flatIdx = getUpdateOffset() + LEFT_COUNT + i}
+          <button
+            class="menu-item"
+            class:gp-focused={flatIdx === gpIdx}
+            onclick={item.action}
+          >{item.label}</button>
+        {/each}
+      </div>
+    </div>
   </nav>
 
   <div class="close-hint">
@@ -169,7 +259,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     animation: slide-in 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
   }
 
@@ -178,17 +268,36 @@
     to   { opacity: 1; transform: translateY(0) scale(1); }
   }
 
-  .menu-item {
+  .columns {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 0;
+  }
+
+  .col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+.menu-item {
     background: none;
     border: none;
     cursor: pointer;
-    font-size: 32px;
+    font-size: 28px;
     font-weight: 800;
     color: var(--text-primary);
     text-shadow: var(--text-shadow);
-    padding: 10px 32px;
+    padding: 8px 28px;
     transition: color 0.12s;
     letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+
+  .menu-item.full-width {
+    font-size: 28px;
+    padding: 8px 28px;
   }
 
   .menu-item:hover,
