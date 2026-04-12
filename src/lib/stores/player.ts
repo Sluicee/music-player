@@ -127,12 +127,13 @@ function startPolling() {
   if (pollTimer) return;
   pollTimer = setInterval(async () => {
     if (!get(currentTrack)) return;
-    position.set(await invoke<number>('audio_get_position'));
+    // Set _advancing = true synchronously before any await so that concurrent
+    // interval ticks can't both slip past the guard (TOCTOU race fix).
     if (_advancing) return;
-    if (await invoke<boolean>('audio_is_finished')) {
-      if (_advancing) return;
-      _advancing = true;
-      try {
+    _advancing = true;
+    try {
+      position.set(await invoke<number>('audio_get_position'));
+      if (await invoke<boolean>('audio_is_finished')) {
         const finished = get(currentTrack);
         if (finished) recordListened(finished.id, get(duration));
         const rm = get(repeatMode);
@@ -172,9 +173,9 @@ function startPolling() {
             }
           }
         }
-      } finally {
-        _advancing = false;
       }
+    } finally {
+      _advancing = false;
     }
   }, 1000);
 }
@@ -311,8 +312,9 @@ export async function playPrev(album: Album) {
   const track = get(currentTrack);
   if (!track) return;
   if (get(position) > 3) {
-    await invoke('audio_play', { path: track.path, duration: track.duration });
-    position.set(0);
+    // Restart the current track through playTrack so that stats, preload,
+    // and saveLastTrack are handled consistently.
+    await playTrack(track, album, _queue.length > 0);
     return;
   }
   if (_queue.length > 0) {

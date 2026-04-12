@@ -11,6 +11,10 @@ pub struct FFmpegSource {
     consumer: Consumer<f32>,
     sample_rate: u32,
     channels: u16,
+    // Counts consecutive silence samples returned when the ring buffer is empty.
+    // If FFmpeg stalls (hangs without exiting), we treat it as end-of-stream after
+    // ~2 seconds of silence so the track can advance normally.
+    silence_count: u32,
 }
 
 impl FFmpegSource {
@@ -113,6 +117,7 @@ impl FFmpegSource {
             consumer,
             sample_rate: 48000,
             channels: 2,
+            silence_count: 0,
         })
     }
 }
@@ -125,15 +130,23 @@ impl Iterator for FFmpegSource {
         // If FFmpeg is slow to start, we return 0.0 (silence) to keep the stream alive.
         // This is THE key to eliminating pops/clicks on Windows.
         match self.consumer.pop() {
-            Ok(sample) => Some(sample),
+            Ok(sample) => {
+                self.silence_count = 0;
+                Some(sample)
+            }
             Err(_) => {
                 // If the producer is gone, it means FFmpeg finished or crashed.
                 if self.consumer.is_abandoned() {
-                    None
-                } else {
-                    // Buffer is empty but FFmpeg is still running. Play silence.
-                    Some(0.0)
+                    return None;
                 }
+                // Buffer is empty but FFmpeg is still running. Play silence.
+                // Guard against FFmpeg hanging: if we've emitted more than ~2 seconds
+                // of silence (96_000 samples at 48kHz stereo), treat it as end-of-stream.
+                self.silence_count += 1;
+                if self.silence_count > 96_000 {
+                    return None;
+                }
+                Some(0.0)
             }
         }
     }

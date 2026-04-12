@@ -76,7 +76,8 @@ fn build_sink(
 
 fn gently_stop(sink: Option<Sink>) {
     if let Some(s) = sink {
-        if s.empty() {
+        // No audio to fade: stop synchronously to avoid spawning a useless thread.
+        if s.empty() || s.is_paused() {
             s.stop();
             return;
         }
@@ -145,6 +146,9 @@ impl AudioPlayer {
                         gently_stop(sink.take()); // Fade out old track immediately
 
                         let volume = state_thread.lock().unwrap().volume;
+                        // Capture time before build_sink so that the position timer
+                        // accounts for FFmpeg startup and preroll (~20-250ms).
+                        let start = Instant::now();
 
                         match build_sink(&app_handle, &handle, &path, volume, 0.0) {
                             Ok(new_sink) => {
@@ -155,7 +159,7 @@ impl AudioPlayer {
                                 st.is_paused = false;
                                 st.current_path = Some(path);
                                 st.duration_secs = duration;
-                                st.play_started_at = Some(Instant::now());
+                                st.play_started_at = Some(start);
                                 st.elapsed_before_pause = 0.0;
                             }
                             Err(e) => eprintln!("[audio] Play failed: {e}"),
@@ -179,6 +183,8 @@ impl AudioPlayer {
 
                         let Some(path) = path else { continue };
                         let target = position.clamp(0.0, duration.max(0.0));
+                        // Capture time before build so the timer accounts for preroll.
+                        let start = Instant::now();
 
                         match build_sink(&app_handle, &handle, &path, volume, target) {
                             Ok(new_sink) => {
@@ -193,11 +199,7 @@ impl AudioPlayer {
                                 st.is_paused = was_paused;
                                 st.current_path = Some(path);
                                 st.duration_secs = duration;
-                                st.play_started_at = if was_paused {
-                                    None
-                                } else {
-                                    Some(Instant::now())
-                                };
+                                st.play_started_at = if was_paused { None } else { Some(start) };
                                 st.elapsed_before_pause = target;
                                 eprintln!("[audio] Seek to {}", target);
                             }
@@ -220,11 +222,16 @@ impl AudioPlayer {
                     }
                     Cmd::Resume => {
                         if let Some(current_sink) = &sink {
-                            current_sink.play();
                             let mut st = state_thread.lock().unwrap();
-                            st.play_started_at = Some(Instant::now());
-                            st.is_playing = true;
-                            st.is_paused = false;
+                            // Only resume if actually paused; otherwise a spurious Resume
+                            // (e.g. from OS media controls) would reset play_started_at
+                            // and cause position to jump back to elapsed_before_pause.
+                            if st.is_paused {
+                                current_sink.play();
+                                st.play_started_at = Some(Instant::now());
+                                st.is_playing = true;
+                                st.is_paused = false;
+                            }
                         }
                     }
                     Cmd::Stop => {
