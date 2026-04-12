@@ -1,7 +1,7 @@
 <script lang="ts">
   import { convertFileSrc } from '@tauri-apps/api/core';
   import type { Track } from '../types';
-  import type { Playlist } from '../stores/playlists';
+  import { playlists, reorderPlaylistTrack, type Playlist } from '../stores/playlists';
   import { albums } from '../stores/library';
   import {
     currentTrack,
@@ -32,9 +32,12 @@
     onclose: () => void;
   } = $props();
 
-  // Build QueueItem[] for playback
+  // Always read from the store so reorders are reflected immediately
+  const currentPlaylist = $derived($playlists.find((p) => p.id === playlist.id) ?? playlist);
+
+  // Build QueueItem[] for playback (rebuilt when tracks reorder)
   const queueItems = $derived(
-    playlist.tracks
+    currentPlaylist.tracks
       .map((track) => {
         const album = $albums.find(
           (a) => a.title === track.album && (a.artist === track.album_artist || a.artist === track.artist)
@@ -45,7 +48,7 @@
   );
 
   // Is any track from this playlist currently active?
-  const isActivePlaylist = $derived(playlist.tracks.some((t) => t.id === $currentTrack?.id));
+  const isActivePlaylist = $derived(currentPlaylist.tracks.some((t) => t.id === $currentTrack?.id));
 
   // Cover: current album's cover if playing from this playlist, else first available
   const activeCoverSrc = $derived((() => {
@@ -145,6 +148,39 @@
   }
 
   const isFavourites = $derived(playlist.id === 'favourites');
+
+  // Drag-to-reorder state (pointer-based, avoids Tauri's OS file-drop interceptor)
+  let listEl = $state<HTMLUListElement | null>(null);
+  let dragIdx = $state<number | null>(null);
+  let dropIdx = $state<number | null>(null);
+
+  function handleHandlePointerDown(e: PointerEvent, idx: number) {
+    e.preventDefault();
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    dragIdx = idx;
+    dropIdx = idx;
+  }
+
+  function handleHandlePointerMove(e: PointerEvent) {
+    if (dragIdx === null || !listEl) return;
+    const items = Array.from(listEl.querySelectorAll<HTMLElement>('li.track'));
+    for (let i = 0; i < items.length; i++) {
+      const rect = items[i].getBoundingClientRect();
+      if (e.clientY < rect.top + rect.height / 2) {
+        dropIdx = i;
+        return;
+      }
+    }
+    dropIdx = items.length - 1;
+  }
+
+  function handleHandlePointerUp() {
+    if (dragIdx !== null && dropIdx !== null && dragIdx !== dropIdx) {
+      reorderPlaylistTrack(playlist.id, dragIdx, dropIdx);
+    }
+    dragIdx = null;
+    dropIdx = null;
+  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -168,23 +204,36 @@
     <!-- Info + tracklist -->
     <div class="panel">
       <div class="playlist-meta">
-        <h2 class="playlist-title">{playlist.name}</h2>
-        <p class="playlist-count">{$t('trackCount', playlist.tracks.length)}</p>
+        <h2 class="playlist-title">{currentPlaylist.name}</h2>
+        <p class="playlist-count">{$t('trackCount', currentPlaylist.tracks.length)}</p>
       </div>
 
-      {#if playlist.tracks.length === 0}
+      {#if currentPlaylist.tracks.length === 0}
         <p class="empty-hint">{$t('noTracksYet')}</p>
       {:else}
-        <ul class="tracklist">
-          {#each playlist.tracks as track (track.id)}
+        <ul class="tracklist" bind:this={listEl}>
+          {#each currentPlaylist.tracks as track, i (track.id)}
             {@const active = $currentTrack?.id === track.id}
-            <li class="track" class:active>
+            <li
+              class="track"
+              class:active
+              class:dragging={dragIdx === i}
+              class:drop-target={dropIdx === i && dragIdx !== i}
+            >
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <span
+                class="drag-handle"
+                aria-hidden="true"
+                onpointerdown={(e) => handleHandlePointerDown(e, i)}
+                onpointermove={handleHandlePointerMove}
+                onpointerup={handleHandlePointerUp}
+              >⠿</span>
               <button class="track-btn" onclick={() => handleTrackClick(track)}>
                 <span class="track-num">
                   {#if active && $isPlaying}
                     <span class="playing-dot">▶</span>
                   {:else}
-                    {track.track_number || '—'}
+                    {i + 1}
                   {/if}
                 </span>
                 <span class="track-title">{track.title}</span>
@@ -327,7 +376,25 @@
   .tracklist::-webkit-scrollbar { width: 3px; }
   .tracklist::-webkit-scrollbar-thumb { background: var(--text-dim); }
 
-  .track { display: flex; align-items: center; }
+  .track { display: flex; align-items: center; border-top: 2px solid transparent; }
+
+  .track.dragging { opacity: 0.35; }
+
+  .track.drop-target { border-top-color: var(--track-active); }
+
+  .drag-handle {
+    font-size: 11px;
+    color: var(--text-dim);
+    opacity: 0;
+    cursor: grab;
+    flex-shrink: 0;
+    padding: 0 3px 0 2px;
+    user-select: none;
+    transition: opacity 0.12s;
+  }
+
+  .tracklist:hover .drag-handle { opacity: 0.4; }
+  .drag-handle:hover { opacity: 1 !important; color: var(--text-primary); }
 
   .track-btn {
     display: flex;

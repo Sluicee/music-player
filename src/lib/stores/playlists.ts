@@ -44,3 +44,15 @@ export function isTrackInPlaylist(playlistId: string, trackId: string): boolean 
     .find((pl) => pl.id === playlistId)
     ?.tracks.some((t) => t.id === trackId) ?? false;
 }
+
+export function reorderPlaylistTrack(playlistId: string, fromIdx: number, toIdx: number) {
+  playlists.update((pls) =>
+    pls.map((pl) => {
+      if (pl.id !== playlistId) return pl;
+      const tracks = [...pl.tracks];
+      const [moved] = tracks.splice(fromIdx, 1);
+      tracks.splice(toIdx, 0, moved);
+      return { ...pl, tracks };
+    })
+  );
+}
