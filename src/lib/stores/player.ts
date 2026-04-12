@@ -121,51 +121,59 @@ function fisherYates<T>(arr: T[]): T[] {
 // ── Polling ───────────────────────────────────────────────────────────────────
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+let _advancing = false;
 
 function startPolling() {
   if (pollTimer) return;
   pollTimer = setInterval(async () => {
     if (!get(currentTrack)) return;
     position.set(await invoke<number>('audio_get_position'));
+    if (_advancing) return;
     if (await invoke<boolean>('audio_is_finished')) {
-      const finished = get(currentTrack);
-      if (finished) recordListened(finished.id, get(duration));
-      const rm = get(repeatMode);
-      if (rm === 'one') {
-        const track = get(currentTrack);
-        const album = get(currentAlbum);
-        if (track && album) await playTrack(track, album, _queue.length > 0);
-      } else if (_queue.length > 0) {
-        const next = _qIdx + 1;
-        if (next < _queue.length) {
-          _qIdx = next;
-          await playTrack(_queue[_qIdx].track, _queue[_qIdx].album, true);
-        } else if (rm === 'all') {
-          _qIdx = 0;
-          await playTrack(_queue[0].track, _queue[0].album, true);
-        } else {
-          // Queue exhausted — stop cleanly, keep track info for display
-          _queue = [];
-          _qIdx = -1;
-          isShuffled.set(false);
-          currentPlaylistId.set(null);
-          await invoke('audio_stop');
-          isPlaying.set(false);
-          isPaused.set(false);
-          stopPolling();
-        }
-      } else {
-        const album = get(currentAlbum);
-        if (album) {
-          if (rm === 'all') {
-            const track = get(currentTrack);
-            const idx = album.tracks.findIndex(t => t.id === track?.id);
-            const nextIdx = (idx + 1) % album.tracks.length;
-            await playTrack(album.tracks[nextIdx], album);
+      if (_advancing) return;
+      _advancing = true;
+      try {
+        const finished = get(currentTrack);
+        if (finished) recordListened(finished.id, get(duration));
+        const rm = get(repeatMode);
+        if (rm === 'one') {
+          const track = get(currentTrack);
+          const album = get(currentAlbum);
+          if (track && album) await playTrack(track, album, _queue.length > 0);
+        } else if (_queue.length > 0) {
+          const next = _qIdx + 1;
+          if (next < _queue.length) {
+            _qIdx = next;
+            await playTrack(_queue[_qIdx].track, _queue[_qIdx].album, true);
+          } else if (rm === 'all') {
+            _qIdx = 0;
+            await playTrack(_queue[0].track, _queue[0].album, true);
           } else {
-            await playNext(album);
+            // Queue exhausted — stop cleanly, keep track info for display
+            _queue = [];
+            _qIdx = -1;
+            isShuffled.set(false);
+            currentPlaylistId.set(null);
+            await invoke('audio_stop');
+            isPlaying.set(false);
+            isPaused.set(false);
+            stopPolling();
+          }
+        } else {
+          const album = get(currentAlbum);
+          if (album) {
+            if (rm === 'all') {
+              const track = get(currentTrack);
+              const idx = album.tracks.findIndex(t => t.id === track?.id);
+              const nextIdx = (idx + 1) % album.tracks.length;
+              await playTrack(album.tracks[nextIdx], album);
+            } else {
+              await playNext(album);
+            }
           }
         }
+      } finally {
+        _advancing = false;
       }
     }
   }, 1000);
