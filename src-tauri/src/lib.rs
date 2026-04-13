@@ -18,7 +18,7 @@ struct UpdateCheck {
     is_available: bool,
 }
 
-// ── Dialog command ────────────────────────────────────────────────────────────
+// ── Dialog commands ───────────────────────────────────────────────────────────
 
 #[tauri::command]
 fn pick_folder(app: tauri::AppHandle) -> Option<String> {
@@ -26,6 +26,37 @@ fn pick_folder(app: tauri::AppHandle) -> Option<String> {
         .file()
         .blocking_pick_folder()
         .map(|p| p.to_string())
+}
+
+#[tauri::command]
+fn pick_save_file(app: tauri::AppHandle, default_name: String) -> Option<String> {
+    app.dialog()
+        .file()
+        .set_file_name(&default_name)
+        .add_filter("M3U Playlist", &["m3u", "m3u8"])
+        .add_filter("CSV Playlist", &["csv"])
+        .add_filter("Text Playlist", &["txt"])
+        .blocking_save_file()
+        .map(|p| p.to_string())
+}
+
+#[tauri::command]
+fn pick_open_file(app: tauri::AppHandle) -> Option<String> {
+    app.dialog()
+        .file()
+        .add_filter("Playlist files", &["m3u", "m3u8", "csv", "txt"])
+        .blocking_pick_file()
+        .map(|p| p.to_string())
+}
+
+#[tauri::command]
+fn write_file(path: String, content: String) -> Result<(), String> {
+    std::fs::write(&path, content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn read_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| e.to_string())
 }
 
 // ── Native Helpers ────────────────────────────────────────────────────────────
@@ -359,6 +390,10 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             pick_folder,
+            pick_save_file,
+            pick_open_file,
+            write_file,
+            read_file,
             scan_music_folder,
             get_library_size,
             audio_play,

@@ -112,6 +112,10 @@ const en = {
   minutesAgo: (n: number) => `${n}m ago`,
   hoursAgo: (n: number) => `${n}h ago`,
   daysAgo: (n: number) => `${n}d ago`,
+  // M3U
+  exportM3U: 'Export',
+  importM3U: 'Import',
+  importedTracks: (n: number) => n > 0 ? `Added ${n} track${n === 1 ? '' : 's'}` : 'No matching tracks found',
 };
 
 const ru: Dict = {
@@ -198,6 +202,10 @@ const ru: Dict = {
   minutesAgo: (n: number) => `${n} мин. назад`,
   hoursAgo: (n: number) => `${n} ч. назад`,
   daysAgo: (n: number) => `${n} дн. назад`,
+  // M3U
+  exportM3U: 'Экспорт',
+  importM3U: 'Импорт',
+  importedTracks: (n: number) => n > 0 ? `Добавлено ${n} тр.` : 'Треки не найдены',
 };
 
 const ja: Dict = {
@@ -279,6 +287,10 @@ const ja: Dict = {
   minutesAgo: (n: number) => `${n}分前`,
   hoursAgo: (n: number) => `${n}時間前`,
   daysAgo: (n: number) => `${n}日前`,
+  // M3U
+  exportM3U: 'エクスポート',
+  importM3U: 'インポート',
+  importedTracks: (n: number) => n > 0 ? `${n}トラック追加` : 'トラックが見つかりません',
 };
 
 // ---------------------------------------------------------------------------

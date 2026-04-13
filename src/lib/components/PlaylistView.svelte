@@ -1,7 +1,7 @@
 <script lang="ts">
   import { convertFileSrc } from '@tauri-apps/api/core';
   import type { Track } from '../types';
-  import { playlists, reorderPlaylistTrack, type Playlist } from '../stores/playlists';
+  import { playlists, reorderPlaylistTrack, exportPlaylist, importIntoPlaylist, type Playlist } from '../stores/playlists';
   import { albums } from '../stores/library';
   import {
     currentTrack,
@@ -149,6 +149,35 @@
 
   const isFavourites = $derived(playlist.id === 'favourites');
 
+  // M3U export / import
+  let m3uStatus = $state<string | null>(null);
+  let m3uStatusTimer = $state<ReturnType<typeof setTimeout> | null>(null);
+
+  function showM3UStatus(msg: string) {
+    if (m3uStatusTimer) clearTimeout(m3uStatusTimer);
+    m3uStatus = msg;
+    m3uStatusTimer = setTimeout(() => { m3uStatus = null; }, 2800);
+  }
+
+  async function handleExport() {
+    playUiSfx('confirm');
+    try {
+      await exportPlaylist(currentPlaylist);
+    } catch (e) {
+      showM3UStatus(String(e));
+    }
+  }
+
+  async function handleImport() {
+    playUiSfx('confirm');
+    try {
+      const n = await importIntoPlaylist(playlist.id);
+      showM3UStatus($t('importedTracks', n));
+    } catch (e) {
+      showM3UStatus(String(e));
+    }
+  }
+
   // Drag-to-reorder state (pointer-based, avoids Tauri's OS file-drop interceptor)
   let listEl = $state<HTMLUListElement | null>(null);
   let dragIdx = $state<number | null>(null);
@@ -280,6 +309,16 @@
           <span class="nav-icon">&gt;&gt;</span>
           <span>{$t('next')}</span>
         </button>
+      {/if}
+    </div>
+    <div class="hints-row hints-row--m3u">
+      {#if currentPlaylist.tracks.length > 0}
+        <button class="hint-btn hint-btn--m3u" onclick={handleExport}>⬇ {$t('exportM3U')}</button>
+        <span class="m3u-sep">·</span>
+      {/if}
+      <button class="hint-btn hint-btn--m3u" onclick={handleImport}>⬆ {$t('importM3U')}</button>
+      {#if m3uStatus}
+        <span class="m3u-status">{m3uStatus}</span>
       {/if}
     </div>
     <div class="hints-row hints-row--volume">
@@ -512,6 +551,35 @@
   }
 
   .hint-btn:disabled { opacity: 0.35; cursor: default; }
+
+  .hints-row--m3u {
+    gap: 10px;
+  }
+
+  .hint-btn--m3u {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+    opacity: 0.7;
+    transition: color 0.15s, opacity 0.15s;
+  }
+
+  .hint-btn--m3u:hover {
+    color: var(--text-primary);
+    opacity: 1;
+  }
+
+  .m3u-sep {
+    color: var(--text-dim);
+    opacity: 0.4;
+    font-size: 10px;
+  }
+
+  .m3u-status {
+    font-size: 10px;
+    color: var(--track-active);
+    animation: fade-in 0.15s ease;
+  }
 
   .shoulder-tag {
     font-size: 9px;
