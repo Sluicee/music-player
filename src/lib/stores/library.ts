@@ -85,7 +85,17 @@ async function scanOne(path: string): Promise<void> {
     unlisten.push(await listen<Album>('scan:album', (e) => {
       albumsFound++;
       scanStatus.update(s => ({ ...s, albumsFound }));
-      albums.update((a) => [...a, e.payload]);
+      // Upsert: replace existing album with same ID to avoid duplicates
+      // (e.g. when a subfolder of an already-scanned path is dropped)
+      albums.update((a) => {
+        const idx = a.findIndex(x => x.id === e.payload.id);
+        if (idx >= 0) {
+          const copy = [...a];
+          copy[idx] = e.payload;
+          return copy;
+        }
+        return [...a, e.payload];
+      });
     }));
     unlisten.push(await listen<void>('scan:done', () => {
       unlisten.forEach(u => u());
@@ -141,8 +151,15 @@ let scanLock: Promise<void> = Promise.resolve();
 export async function scanFolder(path: string) {
   scanLock = scanLock.then(async () => {
     const paths = get(folderPaths);
-    // Skip if already in the library — use "Refresh library" to rescan.
-    if (paths.includes(path)) return;
+    // Normalize for case-insensitive comparison (Windows)
+    const norm = (p: string) => p.replace(/[\\/]+$/, '').toLowerCase();
+    const normPath = norm(path);
+    // Skip if this exact path, or a parent of it, is already tracked
+    const alreadyCovered = paths.some(p => {
+      const np = norm(p);
+      return np === normPath || normPath.startsWith(np + '\\') || normPath.startsWith(np + '/');
+    });
+    if (alreadyCovered) return;
 
     const next = [...paths, path];
     folderPaths.set(next);
